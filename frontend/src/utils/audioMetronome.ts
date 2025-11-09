@@ -64,6 +64,14 @@ class AudioMetronome {
     // Wait a bit to ensure cleanup is complete
     await new Promise(resolve => setTimeout(resolve, 50));
 
+    // Initialize audio context first (required for user interaction)
+    try {
+      await this.initAudioContext();
+    } catch (error) {
+      console.warn('Could not initialize audio context:', error);
+      return;
+    }
+
     this.isPlaying = true;
     this.onBeatCallback = onBeat || null;
 
@@ -71,13 +79,19 @@ class AudioMetronome {
     const intervalMs = (60 / targetBPM) * 1000;
 
     // Play initial beep immediately
-    await this.playBeep();
+    try {
+      await this.playBeep();
+    } catch (error) {
+      console.warn('Could not play initial beep:', error);
+    }
 
     // Set up interval for subsequent beeps
     // In browser environments, setInterval returns a number
     this.intervalId = window.setInterval(() => {
       if (this.isPlaying) {
-        this.playBeep();
+        this.playBeep().catch((error) => {
+          console.warn('Could not play beep in interval:', error);
+        });
       }
     }, intervalMs) as unknown as number;
   }
