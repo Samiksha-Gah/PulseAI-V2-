@@ -26,7 +26,6 @@ interface WalkthroughModeProps {
 export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughModeProps) {
   const [currentStep, setCurrentStep] = useState<WalkthroughStep>('welcome');
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
-  const [compressionCount, setCompressionCount] = useState(0);
   const [metronomeEnabled, setMetronomeEnabled] = useState(true);
 
   const steps: Record<WalkthroughStep, { title: string; instructions: string[] }> = {
@@ -92,7 +91,6 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
 
   const handleMetricsUpdate = (newMetrics: CPRMetrics) => {
     setMetrics(newMetrics);
-    setCompressionCount(newMetrics.compressionCount);
   };
 
   const handleNext = () => {
