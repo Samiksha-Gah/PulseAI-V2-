@@ -19,9 +19,10 @@ export type { CPRMetrics };
 
 interface CameraFeedProps {
   onMetricsUpdate: (metrics: CPRMetrics) => void;
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void; // Callback when canvas is ready for recording
 }
 
-export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
+export function CameraFeed({ onMetricsUpdate, onCanvasReady }: CameraFeedProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const blurCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,6 +30,7 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsInteraction, setNeedsInteraction] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment'); // Default to back camera
 
   const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
   const faceCascadeRef = useRef<any>(null);
@@ -203,6 +205,11 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
       canvas.height = video.videoHeight;
       blurCanvas.width = video.videoWidth;
       blurCanvas.height = video.videoHeight;
+      
+      // Notify parent that canvas is ready for recording
+      if (onCanvasReady) {
+        onCanvasReady(canvas);
+      }
     }
 
     const now = Date.now();
@@ -450,10 +457,15 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
   /**
    * Initialize webcam stream
    */
-  const initializeCamera = async () => {
+  const initializeCamera = async (facing: 'user' | 'environment' = facingMode) => {
     try {
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: 'user' },
+        video: { width: 1280, height: 720, facingMode: facing },
       });
 
       const video = videoRef.current;
@@ -467,6 +479,16 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
             setIsInitialized(true);
             animationFrameRef.current = requestAnimationFrame(processFrame);
             setNeedsInteraction(false);
+            
+            // Notify parent that canvas is ready for recording
+            if (canvasRef.current && onCanvasReady) {
+              // Wait a frame to ensure canvas is fully rendered
+              requestAnimationFrame(() => {
+                if (canvasRef.current) {
+                  onCanvasReady(canvasRef.current);
+                }
+              });
+            }
           } catch (playErr) {
             console.warn('Autoplay blocked, user interaction required to start video', playErr);
             setNeedsInteraction(true);
@@ -485,6 +507,14 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
       console.error('Error accessing camera:', err);
       setError('Failed to access camera. Please allow camera permissions.');
     }
+  };
+
+  /**
+   * Flip camera between front and back
+   */
+  const flipCamera = async () => {
+    const newFacingMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(newFacingMode);
   };
 
   /**
@@ -537,6 +567,27 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
     };
   }, []);
 
+  // Handle camera flip when facingMode changes (skip on initial mount)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    if (isInitialized) {
+      setIsInitialized(false);
+      initializeCamera(facingMode)
+        .then(() => {
+          setError(null);
+        })
+        .catch((err) => {
+          console.error('Error flipping camera:', err);
+          setError('Failed to flip camera');
+        });
+    }
+  }, [facingMode]);
+
   // Watchdog: if not initialized within 4 seconds and no error, show retry button
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -576,6 +627,17 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
         ref={canvasRef}
         className="w-full h-full object-contain"
       />
+      {/* Flip camera button */}
+      {isInitialized && (
+        <button
+          onClick={flipCamera}
+          className="absolute top-2 left-2 z-50 px-3 py-2 bg-gray-800/80 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold backdrop-blur-sm flex items-center gap-2"
+          aria-label="Flip camera"
+        >
+          <span className="text-lg">🔄</span>
+          <span className="hidden sm:inline">Flip Camera</span>
+        </button>
+      )}
       {!isInitialized && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
           <div className="text-center space-y-3">
@@ -583,7 +645,7 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
             <p className="text-sm opacity-75">Please allow camera permissions</p>
             {needsInteraction && (
               <button
-                onClick={initializeCamera}
+                onClick={() => initializeCamera(facingMode)}
                 className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold"
               >
                 Enable Camera

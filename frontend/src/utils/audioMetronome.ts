@@ -6,8 +6,8 @@
 class AudioMetronome {
   private audioContext: AudioContext | null = null;
   private intervalId: number | null = null;
-  private targetBPM: number = 110;
   private isPlaying: boolean = false;
+  private onBeatCallback: (() => void) | null = null;
 
   /**
    * Initialize audio context
@@ -44,6 +44,11 @@ class AudioMetronome {
 
       oscillator.start(context.currentTime);
       oscillator.stop(context.currentTime + 0.1);
+
+      // Trigger visual pulse callback
+      if (this.onBeatCallback) {
+        this.onBeatCallback();
+      }
     } catch (error) {
       console.warn('Could not play metronome beep:', error);
     }
@@ -52,35 +57,51 @@ class AudioMetronome {
   /**
    * Start metronome at target BPM
    */
-  async start(targetBPM: number = 110): Promise<void> {
+  async start(targetBPM: number = 100, onBeat?: () => void): Promise<void> {
     // Always stop first to prevent stacking
     this.stop();
     
-    // Small delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Wait a bit to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 50));
 
-    this.targetBPM = targetBPM;
+    // Initialize audio context first (required for user interaction)
+    try {
+      await this.initAudioContext();
+    } catch (error) {
+      console.warn('Could not initialize audio context:', error);
+      return;
+    }
+
     this.isPlaying = true;
+    this.onBeatCallback = onBeat || null;
 
     // Calculate interval in milliseconds
     const intervalMs = (60 / targetBPM) * 1000;
 
-    // Play initial beep
-    await this.playBeep();
+    // Play initial beep immediately
+    try {
+      await this.playBeep();
+    } catch (error) {
+      console.warn('Could not play initial beep:', error);
+    }
 
-    // Set up interval
+    // Set up interval for subsequent beeps
+    // In browser environments, setInterval returns a number
     this.intervalId = window.setInterval(() => {
       if (this.isPlaying) {
-        this.playBeep();
+        this.playBeep().catch((error) => {
+          console.warn('Could not play beep in interval:', error);
+        });
       }
-    }, intervalMs);
+    }, intervalMs) as unknown as number;
   }
 
   /**
-   * Stop metronome
+   * Stop metronome completely
    */
   stop(): void {
     this.isPlaying = false;
+    this.onBeatCallback = null;
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -88,18 +109,12 @@ class AudioMetronome {
   }
 
   /**
-   * Update target BPM
+   * Check if metronome is currently playing
    */
-  async updateBPM(targetBPM: number): Promise<void> {
-    if (this.isPlaying && targetBPM !== this.targetBPM) {
-      this.stop();
-      await this.start(targetBPM);
-    } else {
-      this.targetBPM = targetBPM;
-    }
+  getIsPlaying(): boolean {
+    return this.isPlaying;
   }
 }
 
 // Export singleton instance
 export const audioMetronome = new AudioMetronome();
-
