@@ -66,7 +66,7 @@ This repository contains the complete monorepo for PulseAI, including the React 
 
 The project is a monorepo containing the frontend and backend in separate directories.
 
-![Project Structure](./assets/project-structure.png)
+![Project Structure](file_structure.png)
 ---
 
 ## Local Development
