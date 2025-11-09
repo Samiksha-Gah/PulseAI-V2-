@@ -9,7 +9,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-Answer-Text', 'X-Service'] // Expose custom headers to frontend
+}));
 app.use(express.json());
 
 // Configure multer for file uploads (memory storage)
@@ -434,10 +436,13 @@ app.post('/api/query', async (req, res) => {
     const audioBuffer = await ttsResponse.arrayBuffer();
     res.set('Content-Type', 'audio/mpeg');
     res.set('X-Answer-Text', finalAnswer); // Include text in header for frontend
-    res.set('X-Service', serviceUsed || 'unknown'); // Include service in header
+    // Normalize service name to lowercase for consistency
+    const normalizedService = serviceUsed ? serviceUsed.toLowerCase() : 'unknown';
+    res.set('X-Service', normalizedService); // Include service in header
     res.send(Buffer.from(audioBuffer));
     
-    console.log(`[Query] Success: ${audioBuffer.byteLength} bytes (powered by ${serviceUsed || 'unknown'})`);
+    console.log(`[Query] Success: ${audioBuffer.byteLength} bytes (powered by ${normalizedService})`);
+    console.log(`[Query] Headers set - X-Answer-Text: "${finalAnswer.substring(0, 50)}...", X-Service: "${normalizedService}"`);
   } catch (err) {
     console.error('[Query] Error:', err && err.stack ? err.stack : err);
     const details = err && err.message ? err.message : String(err);

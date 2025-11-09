@@ -259,13 +259,22 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
       if (contentType && contentType.includes('audio/mpeg')) {
         // Handle audio response - read as blob (body can only be read once)
         console.log('[AskQuestionModal] Received audio response');
+        console.log('[AskQuestionModal] All response headers:', Array.from(queryResponse.headers.entries()));
         
         // Get truncated text from header
-        const answerText = queryResponse.headers.get('X-Answer-Text') || 'Audio response received';
-        const serviceUsed = queryResponse.headers.get('X-Service') || 'unknown';
+        const answerText = queryResponse.headers.get('X-Answer-Text') || queryResponse.headers.get('x-answer-text') || 'Audio response received';
+        const serviceUsed = queryResponse.headers.get('X-Service') || queryResponse.headers.get('x-service') || 'unknown';
         
-        console.log('[AskQuestionModal] Truncated answer text:', answerText);
-        console.log('[AskQuestionModal] Service used:', serviceUsed);
+        console.log('[AskQuestionModal] Truncated answer text from header:', answerText);
+        console.log('[AskQuestionModal] Service used from header:', serviceUsed);
+        
+        // If we still have the fallback, log a warning
+        if (answerText === 'Audio response received') {
+          console.warn('[AskQuestionModal] WARNING: X-Answer-Text header not found in response');
+        }
+        if (serviceUsed === 'unknown') {
+          console.warn('[AskQuestionModal] WARNING: X-Service header not found in response');
+        }
         
         // Convert response to blob and create audio URL (read body only once)
         const audioBlob = await queryResponse.blob();
