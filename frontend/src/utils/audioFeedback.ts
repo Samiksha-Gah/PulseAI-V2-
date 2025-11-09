@@ -21,6 +21,7 @@ class AudioFeedbackManager {
   private isPaused = false;
   private currentAudio: HTMLAudioElement | null = null;
   private lastNotificationTimes: Map<NotificationType, number> = new Map();
+  private lastGlobalNotificationTime: number = 0; // Global throttle for ALL notifications
   private listeners: Set<(state: AudioState) => void> = new Set();
 
   constructor() {
@@ -29,14 +30,14 @@ class AudioFeedbackManager {
 
   /**
    * Queue a notification for TTS
+   * Now uses global throttling - all notifications must be at least 5 seconds apart
    */
   queueNotification(text: string, type: NotificationType = 'depth', priority: number = 3) {
-    // Check minimum interval between same type of notification
-    const lastTime = this.lastNotificationTimes.get(type) || 0;
     const now = Date.now();
     
-    if (now - lastTime < AUDIO_CONFIG.minNotificationInterval) {
-      console.log(`[Audio] Skipping notification (too soon): "${text}"`);
+    // Global throttle: ALL notifications must be at least 5 seconds apart
+    if (this.lastGlobalNotificationTime > 0 && now - this.lastGlobalNotificationTime < AUDIO_CONFIG.minNotificationInterval) {
+      console.log(`[Audio] Skipping notification (global throttle): "${text}"`);
       return;
     }
 
@@ -64,6 +65,7 @@ class AudioFeedbackManager {
     }
 
     this.lastNotificationTimes.set(type, now);
+    this.lastGlobalNotificationTime = now; // Update global throttle time
     this.notifyListeners();
   }
 
@@ -200,12 +202,21 @@ class AudioFeedbackManager {
   }
 
   /**
-   * Clear queue
+   * Clear queue and reset timing
    */
   clearQueue() {
     this.queue = [];
     this.stopCurrent();
+    this.lastGlobalNotificationTime = 0; // Reset global throttle
     this.notifyListeners();
+  }
+
+  /**
+   * Reset timing (useful when starting a new session)
+   */
+  resetTiming() {
+    this.lastGlobalNotificationTime = 0;
+    this.lastNotificationTimes.clear();
   }
 
   /**

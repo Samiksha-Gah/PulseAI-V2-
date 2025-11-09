@@ -85,7 +85,7 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
         
         if (metrics.depthFeedback.color === 'red') {
           if (metrics.depthMm < 50) {
-            message = 'Push deeper';
+            message = 'Compress deeper';
             priority = 2;
           } else if (metrics.depthMm > 60) {
             message = 'Too deep, ease up slightly';
@@ -196,6 +196,11 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
       alert('Failed to save metrics. Please try again.');
     }
   };
+
+  // Reset audio feedback timing when component mounts
+  useEffect(() => {
+    audioFeedback.resetTiming();
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

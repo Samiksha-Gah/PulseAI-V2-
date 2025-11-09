@@ -18,7 +18,7 @@ export const API_ENDPOINTS = {
 
 // Audio notification configuration
 export const AUDIO_CONFIG = {
-  minNotificationInterval: 5000, // Min 5 seconds between same notification type
+  minNotificationInterval: 5000, // Min 5 seconds between ALL notifications (global throttle)
   debounceTime: 2000, // Wait 2 seconds for metric to stabilize
   queueMaxSize: 3, // Max 3 notifications queued
   priorityOverride: true, // Critical alerts clear queue

@@ -3,7 +3,7 @@
  * Displays comprehensive CPR feedback with modern UI and color-coded auras
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { motion } from 'framer-motion';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -19,6 +19,8 @@ export interface FeedbackPanelProps {
 export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const analysisStartTimeRef = useRef<number | null>(null);
+  const INITIAL_DELAY_MS = 5000; // 5 seconds before first notification
 
   // Handle muting metronome when asking a question
   const handleAskStart = () => {
@@ -32,8 +34,27 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
     // The audioFeedback.askQuestion already resumes audioFeedback
   };
 
+  // Track when CPR analysis starts (when metrics first become available)
+  useEffect(() => {
+    if (analysisStartTimeRef.current === null && (bpm > 0 || compressionCount > 0)) {
+      analysisStartTimeRef.current = Date.now();
+      console.log('[FeedbackPanel] CPR analysis started, audio feedback will begin in 5 seconds');
+    }
+  }, [bpm, compressionCount]);
+
   // Show the highest priority message
   useEffect(() => {
+    // Don't queue notifications until 5 seconds have passed since analysis started
+    if (analysisStartTimeRef.current === null) {
+      return; // Analysis hasn't started yet
+    }
+
+    const timeSinceStart = Date.now() - analysisStartTimeRef.current;
+    if (timeSinceStart < INITIAL_DELAY_MS) {
+      // Still in initial 5-second delay period
+      return;
+    }
+
     const priorities = [
       { feedback: rateFeedback, name: 'rate' },
       { feedback: depthFeedback, name: 'depth' },

@@ -102,7 +102,7 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
     compressions: {
       title: 'Perform Compressions',
       instructions: [
-        'Push hard and fast',
+        'Compress hard and fast',
         'Aim for 120 compressions per minute',
         'Compress 2 inches deep',
         'Let chest fully rebound',

@@ -109,7 +109,7 @@ export const CompressionDepthRules = {
 
     if (depthMM < this.MIN_MOVEMENT_TO_COUNT_MM) {
       return {
-        message: 'No compression detected - push harder',
+        message: 'No compression detected - compress harder',
         priority: FeedbackPriority.CRITICAL,
         color: 'red',
       };
@@ -117,7 +117,7 @@ export const CompressionDepthRules = {
 
     if (depthMM < this.DANGEROUS_SHALLOW_MM) {
       return {
-        message: 'Much too shallow! Push at least 2 inches (50mm)',
+        message: 'Much too shallow! Compress at least 2 inches (50mm)',
         priority: FeedbackPriority.CRITICAL,
         color: 'red',
       };
@@ -125,7 +125,7 @@ export const CompressionDepthRules = {
 
     if (depthMM < adjustedMinDepth) {
       return {
-        message: 'Push harder - need at least 2 inches depth',
+        message: 'Compress harder - need at least 2 inches depth',
         priority: FeedbackPriority.HIGH,
         color: 'orange',
       };
