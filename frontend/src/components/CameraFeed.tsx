@@ -28,6 +28,7 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsInteraction, setNeedsInteraction] = useState(false);
 
   const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
   const faceCascadeRef = useRef<any>(null);
@@ -455,16 +456,30 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
         video: { width: 1280, height: 720, facingMode: 'user' },
       });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
         streamRef.current = stream;
-        
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setIsInitialized(true);
-          // Start processing frames
-          animationFrameRef.current = requestAnimationFrame(processFrame);
+
+        const onReady = async () => {
+          try {
+            await video.play();
+            setIsInitialized(true);
+            animationFrameRef.current = requestAnimationFrame(processFrame);
+            setNeedsInteraction(false);
+          } catch (playErr) {
+            console.warn('Autoplay blocked, user interaction required to start video', playErr);
+            setNeedsInteraction(true);
+          }
         };
+
+        video.oncanplay = onReady;
+        video.onloadedmetadata = onReady;
+
+        // If metadata already available, proceed immediately
+        if (video.readyState >= video.HAVE_METADATA) {
+          onReady();
+        }
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
@@ -551,9 +566,17 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
       />
       {!isInitialized && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
-          <div className="text-center">
-            <p className="text-xl mb-2">Initializing...</p>
+          <div className="text-center space-y-3">
+            <p className="text-xl">Initializing...</p>
             <p className="text-sm opacity-75">Please allow camera permissions</p>
+            {needsInteraction && (
+              <button
+                onClick={initializeCamera}
+                className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold"
+              >
+                Enable Camera
+              </button>
+            )}
           </div>
         </div>
       )}
