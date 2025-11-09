@@ -86,3 +86,5 @@ If you see `✗ Missing` for any key, that variable is not set correctly.
 - Rotate keys if they're exposed
 - Use different keys for development and production if possible
 
+
+We having fun!
