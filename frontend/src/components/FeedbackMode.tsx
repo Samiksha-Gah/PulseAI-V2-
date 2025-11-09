@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
-import { CompressionCounter } from './CompressionCounter';
 import { Metronome } from './Metronome';
 import { UploadMock } from './UploadMock';
 
@@ -16,11 +15,9 @@ interface FeedbackModeProps {
 
 export function FeedbackMode({ onBack }: FeedbackModeProps) {
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
-  const [compressionCount, setCompressionCount] = useState(0);
 
   const handleMetricsUpdate = (newMetrics: CPRMetrics) => {
     setMetrics(newMetrics);
-    setCompressionCount(newMetrics.compressionCount);
   };
 
   return (
@@ -44,12 +41,9 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
       {/* Feedback panel */}
       {metrics && <FeedbackPanel metrics={metrics} />}
 
-      {/* Compression counter */}
-      <CompressionCounter count={compressionCount} target={30} />
-
       {/* Metronome - visual only, no audio */}
       <Metronome
-        targetBPM={120}
+        targetBPM={100}
         currentBPM={metrics?.bpm || 0}
         isActive={true}
         audioEnabled={false}

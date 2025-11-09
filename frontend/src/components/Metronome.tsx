@@ -21,19 +21,8 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
   useEffect(() => {
     if (!isActive || targetBPM === 0) {
       setPulse(false);
-      if (audioEnabled) {
-        audioMetronome.stop();
-      }
-      return;
-    }
-
-    // Start audio metronome if enabled
-    if (audioEnabled) {
-      audioMetronome.start(targetBPM).catch((error) => {
-        console.warn('Could not start audio metronome:', error);
-      });
-    } else {
       audioMetronome.stop();
+      return;
     }
 
     // Calculate interval in milliseconds (beats per minute to ms)
@@ -44,11 +33,19 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
       setTimeout(() => setPulse(false), 100); // Pulse duration
     }, intervalMs);
 
+    // Start audio metronome if enabled
+    if (audioEnabled) {
+      audioMetronome.start(targetBPM).catch((error) => {
+        console.warn('Could not start audio metronome:', error);
+      });
+    } else {
+      audioMetronome.stop();
+    }
+
+    // Cleanup function - always stop audio and clear interval
     return () => {
       clearInterval(interval);
-      if (audioEnabled) {
-        audioMetronome.stop();
-      }
+      audioMetronome.stop();
     };
   }, [targetBPM, isActive, audioEnabled]);
 

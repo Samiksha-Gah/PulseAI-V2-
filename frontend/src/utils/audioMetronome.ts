@@ -53,9 +53,11 @@ class AudioMetronome {
    * Start metronome at target BPM
    */
   async start(targetBPM: number = 110): Promise<void> {
-    if (this.isPlaying) {
-      this.stop();
-    }
+    // Always stop first to prevent stacking
+    this.stop();
+    
+    // Small delay to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     this.targetBPM = targetBPM;
     this.isPlaying = true;

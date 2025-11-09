@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
-import { CompressionCounter } from './CompressionCounter';
 import { Metronome } from './Metronome';
 import { UploadMock } from './UploadMock';
 
@@ -28,6 +27,7 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
   const [currentStep, setCurrentStep] = useState<WalkthroughStep>('welcome');
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
   const [compressionCount, setCompressionCount] = useState(0);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(true);
 
   const steps: Record<WalkthroughStep, { title: string; instructions: string[] }> = {
     welcome: {
@@ -162,13 +162,20 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
         <>
           <CameraFeed onMetricsUpdate={handleMetricsUpdate} />
           {metrics && <FeedbackPanel metrics={metrics} />}
-          <CompressionCounter count={compressionCount} target={30} />
           <Metronome
-            targetBPM={120}
+            targetBPM={100}
             currentBPM={metrics?.bpm || 0}
             isActive={true}
-            audioEnabled={true}
+            audioEnabled={metronomeEnabled}
           />
+          {/* Metronome toggle button */}
+          <button
+            onClick={() => setMetronomeEnabled(!metronomeEnabled)}
+            className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-gray-800/80 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold backdrop-blur-sm flex items-center gap-2"
+          >
+            <span>{metronomeEnabled ? '🔊' : '🔇'}</span>
+            <span>Metronome: {metronomeEnabled ? 'ON' : 'OFF'}</span>
+          </button>
         </>
       ) : (
         /* Instruction overlay */
