@@ -250,8 +250,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
         // Combine error message
         const fullErrorMessage = `${errorMessage}${errorDetails}`;
         console.error('[AskQuestionModal] Full error message:', fullErrorMessage);
-        // Include a user friendly message along with the technical error so the variable is used
-        throw new Error(`${fullErrorMessage} - ${userFriendlyMessage}`);
+        throw new Error(fullErrorMessage);
       }
 
       // Response is OK - check if it's audio or JSON

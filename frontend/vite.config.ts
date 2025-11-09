@@ -20,13 +20,13 @@ export default defineConfig({
     port: 3000, // Default Vite dev server port
     proxy: {
       '/api': {
-        target: 'http://localhost:3001', // Backend runs on port 3001 (matches backend/.env PORT=3001)
+        target: 'http://localhost:10000', // Backend runs on port 10000 (matches backend/.env PORT=10000)
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Keep the /api prefix
       },
       '/health': {
-        target: 'http://localhost:3001', // Backend runs on port 3001 (matches backend/.env PORT=3001)
+        target: 'http://localhost:10000', // Backend runs on port 10000 (matches backend/.env PORT=10000)
         changeOrigin: true,
         secure: false,
       },

@@ -67,7 +67,7 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw, servic
             className="fixed inset-0 z-[121] flex items-center justify-center p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="max-w-3xl w-full bg-gray-900/90 backdrop-blur-lg rounded-2xl p-6 border-2 border-blue-500/30 shadow-2xl overflow-hidden">
+            <div className="max-w-4xl w-full bg-gray-900/95 backdrop-blur-lg rounded-2xl p-6 md:p-8 border-2 border-blue-500/30 shadow-2xl overflow-hidden">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-bold text-white">Session Summary</h3>
@@ -99,64 +99,124 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw, servic
                 )}
 
                 {!loading && structured && (
-                  <div className="max-h-[60vh] mt-2 space-y-4 summary-scrollbar">
-                      <div className="overflow-auto rounded-xl p-2 max-h-[52vh]">
+                  <div className="max-h-[70vh] mt-4 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
+                    {/* Executive Summary */}
                     {structured.executiveSummary && (
-                      <div className="bg-gray-800/60 p-3 rounded-md border border-gray-700">
-                        <p className="text-sm text-gray-100 leading-relaxed">{structured.executiveSummary}</p>
+                      <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 p-5 rounded-xl border border-blue-500/20 shadow-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <h4 className="text-base font-bold text-white">Executive Summary</h4>
+                        </div>
+                        <p className="text-sm text-gray-200 leading-relaxed">{structured.executiveSummary}</p>
                       </div>
                     )}
 
+                    {/* Key Metrics */}
                     {structured.keyMetrics && (
-                      <div className="bg-gray-800/60 p-3 rounded-md border border-gray-700">
-                        <h4 className="text-sm font-semibold text-white mb-2">Key Metrics</h4>
-                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-100">
-                          {Object.entries(structured.keyMetrics).map(([k, v]) => (
-                            <div key={k} className="flex justify-between">
-                              <span className="text-gray-300 capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
-                              <span className="font-medium">{String(v)}</span>
-                            </div>
-                          ))}
+                      <div className="bg-gray-800/40 p-5 rounded-xl border border-gray-700/50">
+                        <div className="flex items-center gap-2 mb-4">
+                          <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <h4 className="text-base font-bold text-white">Key Metrics</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {Object.entries(structured.keyMetrics).map(([k, v]) => {
+                            const formattedKey = k.replace(/([A-Z])/g, ' $1').trim();
+                            const formattedValue = typeof v === 'number' 
+                              ? (k.toLowerCase().includes('bpm') || k.toLowerCase().includes('rate') 
+                                  ? `${Math.round(v)} BPM`
+                                  : k.toLowerCase().includes('depth') || k.toLowerCase().includes('mm')
+                                  ? `${v} mm`
+                                  : k.toLowerCase().includes('sec') || k.toLowerCase().includes('time')
+                                  ? `${v}s`
+                                  : k.toLowerCase().includes('total')
+                                  ? v.toLocaleString()
+                                  : v)
+                              : String(v);
+                            
+                            return (
+                              <div key={k} className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/30">
+                                <div className="text-xs text-gray-400 mb-1 uppercase tracking-wide">{formattedKey}</div>
+                                <div className="text-lg font-bold text-white">{formattedValue}</div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
 
+                    {/* Timeline */}
                     {structured.timeline && structured.timeline.length > 0 && (
-                      <div className="bg-gray-800/60 p-3 rounded-md border border-gray-700">
-                        <h4 className="text-sm font-semibold text-white mb-2">Timeline</h4>
-                        <ul className="text-sm text-gray-100 space-y-1">
-                          {structured.timeline.map((item, idx) => (
-                            <li key={idx}>
-                              <span className="text-gray-300">{item.time || ''}</span>
-                              <span className="ml-2">{item.event}</span>
+                      <div className="bg-gray-800/40 p-5 rounded-xl border border-gray-700/50">
+                        <div className="flex items-center gap-2 mb-4">
+                          <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <h4 className="text-base font-bold text-white">Session Timeline</h4>
+                        </div>
+                        <div className="relative">
+                          {/* Timeline line */}
+                          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700/50"></div>
+                          <div className="space-y-4">
+                            {structured.timeline.map((item, idx) => (
+                              <div key={idx} className="relative flex items-start gap-4 pl-2">
+                                {/* Timeline dot */}
+                                <div className="relative z-10 mt-1.5">
+                                  <div className="w-3 h-3 rounded-full bg-yellow-400 border-2 border-gray-900"></div>
+                                </div>
+                                <div className="flex-1 pb-4">
+                                  <div className="text-xs font-semibold text-yellow-400 mb-1">{item.time || `${idx * 10}s`}</div>
+                                  <div className="text-sm text-gray-200 leading-relaxed">{item.event}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recommendations */}
+                    {structured.recommendations && structured.recommendations.length > 0 && (
+                      <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 p-5 rounded-xl border border-green-500/20">
+                        <div className="flex items-center gap-2 mb-4">
+                          <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <h4 className="text-base font-bold text-white">Recommendations</h4>
+                        </div>
+                        <ul className="space-y-3">
+                          {structured.recommendations.map((r, i) => (
+                            <li key={i} className="flex items-start gap-3">
+                              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0"></div>
+                              <span className="text-sm text-gray-200 leading-relaxed">{r}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
-                    {structured.recommendations && structured.recommendations.length > 0 && (
-                      <div className="bg-gray-800/60 p-3 rounded-md border border-gray-700">
-                        <h4 className="text-sm font-semibold text-white mb-2">Recommendations</h4>
-                        <ul className="list-disc list-inside text-sm text-gray-100 space-y-1">
-                          {structured.recommendations.map((r, i) => (
-                            <li key={i}>{r}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
+                    {/* Uncertainties / Notes */}
                     {structured.uncertainties && structured.uncertainties.length > 0 && (
-                      <div className="bg-gray-800/60 p-3 rounded-md border border-gray-700">
-                        <h4 className="text-sm font-semibold text-white mb-2">Uncertainties / Notes</h4>
-                        <ul className="text-sm text-gray-100 space-y-1">
+                      <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-5 rounded-xl border border-amber-500/20">
+                        <div className="flex items-center gap-2 mb-4">
+                          <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <h4 className="text-base font-bold text-white">Notes & Uncertainties</h4>
+                        </div>
+                        <ul className="space-y-2">
                           {structured.uncertainties.map((u, i) => (
-                            <li key={i}>{u}</li>
+                            <li key={i} className="flex items-start gap-3">
+                              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></div>
+                              <span className="text-sm text-gray-200 leading-relaxed">{u}</span>
+                            </li>
                           ))}
                         </ul>
                       </div>
                     )}
-                    </div>
                   </div>
                 )}
 

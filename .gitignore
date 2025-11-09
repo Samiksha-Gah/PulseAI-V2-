@@ -8,5 +8,9 @@ __pycache__/
 node_modules/
 build/
 dist/
-# backend local env
+# backend local env - ignore .env but allow .env.example
 backend/.env
+!backend/.env.example
+# Also ignore any .env files in root
+.env
+!.env.example
