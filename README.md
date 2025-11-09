@@ -13,10 +13,8 @@ This README is meant to be a single reference for developers running the project
 - API endpoints (server)
 - Troubleshooting & common errors
 - Security & secrets
-- Testing & build
+- Testing & validation
 - Deployment notes
-- Contributing
-- License
 
 ---
 
