@@ -1,10 +1,10 @@
 /**
  * Visual Metronome Component
  * Pulses at target BPM rate to guide compression rhythm
- * Can play audio beeps in walkthrough mode
+ * Can play audio beeps when enabled
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { audioMetronome } from '../utils/audioMetronome';
 
@@ -12,53 +12,77 @@ interface MetronomeProps {
   targetBPM: number; // Target BPM (100-120)
   currentBPM: number;
   isActive: boolean;
-  audioEnabled?: boolean; // Enable audio beeps (for walkthrough mode)
+  audioEnabled?: boolean; // Enable audio beeps
 }
 
 export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = false }: MetronomeProps) {
   const [pulse, setPulse] = useState(false);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isActive || targetBPM === 0) {
-      setPulse(false);
+    // Cleanup function
+    const cleanup = () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
       audioMetronome.stop();
+      setPulse(false);
+    };
+
+    // If not active, stop everything
+    if (!isActive) {
+      cleanup();
       return;
     }
 
-    // Calculate interval in milliseconds (beats per minute to ms)
+    // Always set up visual pulse (independent of audio)
     const intervalMs = (60 / targetBPM) * 1000;
-
-    const interval = setInterval(() => {
+    
+    // Set up visual pulse interval
+    const visualInterval = setInterval(() => {
       setPulse(true);
-      setTimeout(() => setPulse(false), 100); // Pulse duration
+      setTimeout(() => setPulse(false), 100);
     }, intervalMs);
+    
+    intervalRef.current = visualInterval;
 
-    // Start audio metronome if enabled
+    // Start audio metronome only if audio is enabled
     if (audioEnabled) {
-      audioMetronome.start(targetBPM).catch((error) => {
-        console.warn('Could not start audio metronome:', error);
-      });
+      const startAudio = async () => {
+        // Always clean up audio first to prevent stacking
+        audioMetronome.stop();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Start audio metronome (visual pulse is already handled by interval above)
+        audioMetronome.start(targetBPM).catch((error) => {
+          console.warn('Could not start audio metronome:', error);
+        });
+      };
+      
+      startAudio();
     } else {
+      // Stop audio if disabled
       audioMetronome.stop();
     }
 
-    // Cleanup function - always stop audio and clear interval
+    // Cleanup on unmount or when dependencies change
     return () => {
-      clearInterval(interval);
+      clearInterval(visualInterval);
       audioMetronome.stop();
     };
   }, [targetBPM, isActive, audioEnabled]);
 
-  // Always show visual metronome when active, audio is handled separately
+  // Don't render if not active (but show visual even if audio is disabled)
   if (!isActive) {
     return null;
   }
 
   const bpmDiff = Math.abs(currentBPM - targetBPM);
-  const isOnBeat = currentBPM > 0 && bpmDiff <= 10; // Consider "on beat" if within 10 BPM
+  const isOnBeat = currentBPM > 0 && bpmDiff <= 10;
 
   return (
-    <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
       <div className="flex flex-col items-center">
         {/* Metronome pulse indicator with aura */}
         <motion.div
@@ -93,14 +117,11 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
           />
         </motion.div>
 
-        {/* Audio indicator only */}
-        {audioEnabled && (
-          <div className="mt-2 text-center">
-            <div className="text-xs text-blue-400">Audio: ON</div>
-          </div>
-        )}
+        {/* Audio indicator */}
+        <div className="mt-2 text-center">
+          <div className="text-xs text-blue-400">Audio: ON</div>
+        </div>
       </div>
     </div>
   );
 }
-
