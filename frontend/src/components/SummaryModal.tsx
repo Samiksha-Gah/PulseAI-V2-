@@ -71,7 +71,7 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw, servic
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-bold text-white">Session Summary</h3>
-                  <p className="text-sm text-gray-400">AI-generated summary{service ? ` — ${service}` : ''}</p>
+                  <p className="text-sm text-gray-400">AI-generated summary</p>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   <button onClick={downloadSummary} disabled={!structured && !raw} className="px-2 py-1 bg-gray-800/40 text-gray-200 hover:bg-gray-800/60 rounded-md text-sm disabled:opacity-40" title="Download summary">

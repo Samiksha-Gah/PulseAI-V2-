@@ -20,7 +20,6 @@ interface AskQuestionModalProps {
 export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initialMode }: AskQuestionModalProps) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
-  const [service, setService] = useState<string | null>(null); // 'gemini' or 'openai'
   const [isAsking, setIsAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -45,7 +44,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
       setMode('initial');
       setQuestion('');
       setAnswer(null);
-      setService(null);
       setError(null);
     }
     // Note: startRecording is intentionally not in deps - it's stable and we only call it when voice mode opens
@@ -64,7 +62,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
     setIsAsking(true);
     setError(null);
     setAnswer(null);
-    setService(null);
 
     // Stop metronome and pause audio feedback
     audioMetronome.stop();
@@ -263,17 +260,12 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
         
         // Get truncated text from header
         const answerText = queryResponse.headers.get('X-Answer-Text') || queryResponse.headers.get('x-answer-text') || 'Audio response received';
-        const serviceUsed = queryResponse.headers.get('X-Service') || queryResponse.headers.get('x-service') || 'unknown';
         
         console.log('[AskQuestionModal] Truncated answer text from header:', answerText);
-        console.log('[AskQuestionModal] Service used from header:', serviceUsed);
         
         // If we still have the fallback, log a warning
         if (answerText === 'Audio response received') {
           console.warn('[AskQuestionModal] WARNING: X-Answer-Text header not found in response');
-        }
-        if (serviceUsed === 'unknown') {
-          console.warn('[AskQuestionModal] WARNING: X-Service header not found in response');
         }
         
         // Convert response to blob and create audio URL (read body only once)
@@ -302,7 +294,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
         
         // Display truncated text
         setAnswer(answerText);
-        setService(serviceUsed);
         setError(null);
         setIsAsking(false);
       } else {
@@ -325,7 +316,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
           
           if (queryData?.answer) {
             setAnswer(queryData.answer);
-            setService(queryData.service || null);
             setError(null);
             setIsAsking(false);
             audioFeedback.resume();
@@ -478,7 +468,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
       }
       setQuestion('');
       setAnswer(null);
-      setService(null);
       setError(null);
       setMode('initial');
       audioFeedback.resume();
@@ -540,7 +529,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
               </div>
 
               <p className="text-sm text-gray-400 mb-4">
-                Ask any CPR-related question powered by Gemini / OpenAI. All audio will be muted while you receive your answer!
+                Ask any CPR-related question. All audio will be muted while you receive your answer!
               </p>
 
               {/* Initial mode: Show two buttons */}
@@ -634,11 +623,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
                 <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <p className="text-sm font-semibold text-blue-300 mb-2">Answer:</p>
                   <p className="text-white text-sm leading-relaxed">{answer}</p>
-                  {service && (
-                    <p className="text-xs text-gray-500 mt-3 text-right italic">
-                      powered by {service === 'gemini' ? 'gemini' : service === 'openai' ? 'openai' : service}
-                    </p>
-                  )}
                 </div>
               )}
 
