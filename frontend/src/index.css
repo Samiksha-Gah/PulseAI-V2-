@@ -18,3 +18,35 @@ body {
   overflow: hidden;
 }
 
+.summary-scrollbar .overflow-auto,
+.summary-scrollbar > .overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.4) transparent; /* thumb track */
+}
+
+/* WebKit browsers */
+.summary-scrollbar .overflow-auto::-webkit-scrollbar,
+.summary-scrollbar > .overflow-auto::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.summary-scrollbar .overflow-auto::-webkit-scrollbar-track,
+.summary-scrollbar > .overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 12px;
+}
+
+.summary-scrollbar .overflow-auto::-webkit-scrollbar-thumb,
+.summary-scrollbar > .overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(125, 140, 162, 0.45);
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.summary-scrollbar .overflow-auto::-webkit-scrollbar-thumb:hover,
+.summary-scrollbar > .overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 140, 162, 0.6);
+}
+

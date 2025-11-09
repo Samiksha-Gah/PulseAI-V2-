@@ -219,7 +219,7 @@ class AudioFeedbackManager {
           this.resume();
           resolve();
         };
-        audio.onerror = (e) => {
+        audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
           this.resume();
           reject(new Error('Audio playback failed'));

@@ -14,12 +14,14 @@ export interface FeedbackPanelProps {
   metronomeEnabled?: boolean;
   onMetronomeToggle?: () => void;
   onSaveVideo?: () => void;
+  onSummarizeSession?: () => Promise<void>;
 }
 
-export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
+export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo, onSummarizeSession }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
   const [askModalMode, setAskModalMode] = useState<'typing' | 'voice' | undefined>(undefined);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const analysisStartTimeRef = useRef<number | null>(null);
   const errorStartTimeRef = useRef<number | null>(null); // Track when errors started
   const hasShownStartMessageRef = useRef<boolean>(false); // Track if we've shown "start compressions"
@@ -365,6 +367,23 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                       <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                     </svg>
                     <span className="text-[10px]">Voice Question</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!onSummarizeSession) return;
+                      try {
+                        setIsSummarizing(true);
+                        await onSummarizeSession();
+                      } catch (err) {
+                        console.error('[FeedbackPanel] Summarize failed', err);
+                      } finally {
+                        setIsSummarizing(false);
+                      }
+                    }}
+                    disabled={!onSummarizeSession}
+                    className="px-3 py-2 bg-indigo-600/90 text-white rounded-lg hover:bg-indigo-500 transition-colors text-xs font-semibold"
+                  >
+                    {isSummarizing ? 'Summarizing...' : 'Summarize Session'}
                   </button>
                 </div>
               </div>

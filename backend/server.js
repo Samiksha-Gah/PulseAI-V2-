@@ -65,9 +65,10 @@ app.post('/api/tts', async (req, res) => {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[TTS] ElevenLabs error:', errorText);
-      return res.status(response.status).json({ error: 'TTS generation failed' });
+      const errorText = await response.text().catch(() => '<no body>');
+      console.error('[TTS] ElevenLabs error:', response.status, errorText);
+      // Return upstream error body in development to help debugging
+      return res.status(response.status).json({ error: 'TTS generation failed', details: errorText });
     }
 
     const audioBuffer = await response.arrayBuffer();
@@ -443,6 +444,177 @@ app.post('/api/query', async (req, res) => {
     const details = err && err.message ? err.message : String(err);
     const stack = err && err.stack ? err.stack : undefined;
     res.status(500).json({ error: 'Query request failed', details, stack });
+  }
+});
+
+// Summarize endpoint - accepts recorded session JSON and returns a comprehensive summary (text)
+app.post('/api/summarize', async (req, res) => {
+  const sessionData = req.body;
+
+  if (!sessionData) {
+    return res.status(400).json({ error: 'Session data is required' });
+  }
+
+  if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Neither Gemini nor OpenAI API key is configured' });
+  }
+
+  try {
+  // Request a strict JSON object from the LLM so the frontend can render predefined sections.
+  // The JSON schema to return MUST be valid JSON (no surrounding markdown). Fields:
+  // {
+  //   "executiveSummary": string,
+  //   "keyMetrics": { "averageBPM": number, "averageDepthMm": number, "totalCompressions": number, "timeInTargetRangeSec": number, ... },
+  //   "timeline": [{ "time": string, "event": string }],
+  //   "recommendations": [string],
+  //   "uncertainties": [string]
+  // }
+  const prompt = `You are an expert CPR instructor and data analyst. Given the following session JSON (per-second CPR metrics), produce a JSON object that strictly follows this schema (no markdown, no explanations):
+\n+    {
+    "executiveSummary": "short 2-4 sentence summary",
+    "keyMetrics": { "averageBPM": number, "averageDepthMm": number, "totalCompressions": number, "timeInTargetRangeSec": number },
+    "timeline": [{ "time": "ISO timestamp or relative", "event": "description" }],
+    "recommendations": ["bullet items, concise"],
+    "uncertainties": ["notes about missing or unreliable data"]
+  }
+\n+    Be explicit about units and assumptions. Now provide the JSON for this session data:
+\n+    ${JSON.stringify(sessionData, null, 2)}`;
+
+    let summary = null;
+    let serviceUsed = null;
+
+    // Try Gemini first
+    if (GEMINI_API_KEY) {
+      try {
+        const geminiBody = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 2000, temperature: 0.2, topP: 0.9 },
+        };
+
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        const gResp = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiBody),
+        });
+
+        if (gResp.ok) {
+          const gJson = await gResp.json();
+          // Extract text robustly
+          const tryGet = (obj, ...path) => {
+            try {
+              let cur = obj;
+              for (const p of path) {
+                if (cur == null) return null;
+                cur = cur[p];
+              }
+              return cur == null ? null : cur;
+            } catch (e) {
+              return null;
+            }
+          };
+          // Extract text and try to parse JSON
+          const rawText = tryGet(gJson, 'candidates', 0, 'content', 'parts', 0, 'text') || tryGet(gJson, 'candidates', 0, 'content', 0, 'text') || tryGet(gJson, 'output', 0, 'content', 0, 'text');
+          if (rawText) {
+            try {
+              const parsed = JSON.parse(rawText);
+              summary = parsed;
+              serviceUsed = 'gemini';
+            } catch (e) {
+              // Not valid JSON - keep raw text in fallback
+              summary = null;
+              console.warn('[Summarize] Gemini returned non-JSON; raw text will be used as fallback');
+            }
+          }
+        } else {
+          console.warn('[Summarize] Gemini request failed, falling back to OpenAI if available');
+        }
+      } catch (gemErr) {
+        console.error('[Summarize] Gemini error:', gemErr);
+      }
+    }
+
+    // Fallback to OpenAI if Gemini didn't produce an answer
+    if (!summary && OPENAI_API_KEY) {
+      try {
+        const openaiModel = 'gpt-4';
+        const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+          body: JSON.stringify({
+            model: openaiModel,
+            messages: [
+              { role: 'system', content: 'You are an expert CPR instructor and data analyst. Summarize session metrics into a human-readable report in Markdown.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 2000,
+            temperature: 0.2
+          })
+        });
+
+        if (openaiResp.ok) {
+          const openaiJson = await openaiResp.json();
+          if (openaiJson.choices && openaiJson.choices.length > 0) {
+            const choice = openaiJson.choices[0];
+            const raw = choice.message?.content || choice.text || null;
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                summary = parsed;
+                serviceUsed = 'openai';
+              } catch (e) {
+                console.warn('[Summarize] OpenAI returned non-JSON; raw text will be used as fallback');
+                summary = null;
+              }
+            }
+          }
+        } else {
+          const errText = await openaiResp.text().catch(() => '<no body>');
+          console.error('[Summarize] OpenAI error:', errText);
+        }
+      } catch (openaiErr) {
+        console.error('[Summarize] OpenAI request failed:', openaiErr);
+      }
+    }
+
+    // If we didn't get a parsed structured object, try one more attempt: if we have any raw text from Gemini/OpenAI, return it as 'raw'
+    // For clarity, the response will contain either `structured` (object) or `raw` (string)
+    if (summary && typeof summary === 'object') {
+      return res.json({ structured: summary, raw: null, service: serviceUsed || 'unknown' });
+    }
+
+    // As fallback, attempt to ask OpenAI for a short plain-text summary if structured parsing failed
+    try {
+      // Re-run a simpler OpenAI call asking for a short plaintext summary (not JSON)
+      if (OPENAI_API_KEY) {
+        const fallbackResp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'You are an expert CPR instructor. Produce a concise human-readable summary (not JSON) of the submitted session data.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 500,
+            temperature: 0.2
+          })
+        });
+
+        if (fallbackResp.ok) {
+          const fallbackJson = await fallbackResp.json();
+          const fallbackText = fallbackJson.choices && fallbackJson.choices[0] && (fallbackJson.choices[0].message?.content || fallbackJson.choices[0].text);
+          return res.json({ structured: null, raw: fallbackText || 'No summary available', service: 'openai' });
+        }
+      }
+    } catch (e) {
+      console.warn('[Summarize] Fallback plaintext attempt failed:', e);
+    }
+
+    return res.status(500).json({ error: 'AI summarization failed', details: 'Could not produce structured summary or fallback plaintext' });
+  } catch (err) {
+    console.error('[Summarize] Error:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: 'Summarization failed', details: err.message || String(err) });
   }
 });
 

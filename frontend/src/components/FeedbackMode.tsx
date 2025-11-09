@@ -7,6 +7,8 @@ import { useState, useEffect, useRef } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
+import { API_ENDPOINTS } from '../config';
+import { SummaryModal } from './SummaryModal';
 // Recording of video removed. We now sample metrics per-second and export JSON.
 import { audioFeedback } from '../utils/audioFeedback';
 
@@ -197,6 +199,50 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
     }
   };
 
+  // Summarize session logic (similar to WalkthroughMode)
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryStructured, setSummaryStructured] = useState<any | null>(null);
+  const [summaryRaw, setSummaryRaw] = useState<string | null>(null);
+  const [summaryService, setSummaryService] = useState<string | null>(null);
+
+  const handleSummarizeSession = async () => {
+    const data = recordedDataRef.current;
+    if (!data || data.length === 0) {
+      alert('No metrics recorded yet to summarize');
+      return;
+    }
+
+  setIsSummarizing(true);
+  setIsSummaryOpen(true);
+  setSummaryStructured(null);
+  setSummaryRaw(null);
+  setSummaryService(null);
+
+    try {
+      const resp = await fetch(API_ENDPOINTS.summarize, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generatedAt: new Date().toISOString(), samples: data }),
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '<no body>');
+        throw new Error(`Summarize request failed: ${resp.status} ${errText}`);
+      }
+
+      const json = await resp.json();
+      setSummaryStructured(json.structured || null);
+      setSummaryRaw(json.raw || null);
+      setSummaryService(json.service || null);
+    } catch (err) {
+      console.error('Failed to summarize session:', err);
+      setSummaryRaw(`Failed to generate summary: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   // Reset audio feedback timing when component mounts
   useEffect(() => {
     audioFeedback.resetTiming();
@@ -233,8 +279,11 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
           metronomeEnabled={metronomeEnabled}
           onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
           onSaveVideo={handleSaveVideo}
+          onSummarizeSession={handleSummarizeSession}
         />
       )}
+
+  <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} loading={isSummarizing} structured={summaryStructured} raw={summaryRaw} service={summaryService} />
 
       {/* Metronome */}
       <Metronome
