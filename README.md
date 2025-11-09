@@ -64,23 +64,24 @@ This repository contains the complete monorepo for PulseAI, including the React 
 
 ## Project Structure
 
-> The project is a monorepo containing the frontend and backend in separate directories.
-/
-├── backend/           # Node.js/Express server
-│   ├── server.js      # Main API server logic
-│   ├── package.json   # Backend dependencies
-│   └── .env           # (Not committed) API keys and secrets
+The project is a monorepo containing the frontend and backend in separate directories.
+
+PulseAI/
+├── backend/                 # Node.js/Express server
+│   ├── server.js            # Main API server logic
+│   ├── package.json         # Backend dependencies
+│   └── .env                 # (Not committed) API keys and secrets
 │
-├── frontend/          # React/Vite client application
+├── frontend/                # React/Vite client application
 │   ├── src/
-│   │   ├── components/  # React components (CameraFeed, FeedbackPanel, etc.)
-│   │   ├── utils/       # CPR logic, audio handlers, config
-│   │   └── App.tsx      # Main application component
+│   │   ├── components/      # React components (CameraFeed, FeedbackPanel, etc.)
+│   │   ├── utils/           # CPR logic, audio handlers, config
+│   │   └── App.tsx          # Main application component
 │   │
-│   ├── package.json   # Frontend dependencies
-│   └── vite.config.ts # Vite configuration with backend proxy
+│   ├── package.json         # Frontend dependencies
+│   └── vite.config.ts       # Vite configuration with backend proxy
 │
-└── README.md          # This file
+└── README.md                # Project documentation
 ---
 
 ## Local Development
