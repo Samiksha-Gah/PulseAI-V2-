@@ -63,11 +63,11 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw }: Summ
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[121] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[121] flex items-center justify-center p-2 md:p-4 overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="max-w-4xl w-full bg-gray-900/95 backdrop-blur-lg rounded-2xl p-6 md:p-8 border-2 border-blue-500/30 shadow-2xl overflow-hidden">
-              <div className="flex items-start justify-between gap-4">
+            <div className="max-w-4xl w-full bg-gray-900/95 backdrop-blur-lg rounded-2xl p-4 md:p-6 lg:p-8 border-2 border-blue-500/30 shadow-2xl my-auto max-h-[95vh] md:max-h-[90vh] flex flex-col">
+              <div className="flex items-start justify-between gap-4 flex-shrink-0">
                 <div>
                   <h3 className="text-lg font-bold text-white">Session Summary</h3>
                   <p className="text-sm text-gray-400">AI-generated summary</p>
@@ -86,7 +86,7 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw }: Summ
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-4 flex-1 overflow-y-auto min-h-0">
                 {loading && (
                   <div className="flex items-center gap-3 text-blue-400">
                     <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -98,7 +98,7 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw }: Summ
                 )}
 
                 {!loading && structured && (
-                  <div className="max-h-[70vh] mt-4 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
+                  <div className="overflow-y-auto pr-2 space-y-6 custom-scrollbar">
                     {/* Executive Summary */}
                     {structured.executiveSummary && (
                       <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 p-5 rounded-xl border border-blue-500/20 shadow-lg">
@@ -220,8 +220,8 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw }: Summ
                 )}
 
                 {!loading && !structured && raw && (
-                  <div className="max-h-[60vh] mt-2 summary-scrollbar">
-                    <div className="overflow-auto rounded-xl p-2 max-h-[52vh]">
+                  <div className="overflow-y-auto summary-scrollbar">
+                    <div className="overflow-auto rounded-xl p-2">
                       <div className="bg-gray-800/70 p-4 rounded-md border border-gray-700">
                         <pre className="whitespace-pre-wrap text-sm text-gray-100 leading-relaxed font-sans">{raw}</pre>
                       </div>
@@ -234,7 +234,7 @@ export function SummaryModal({ isOpen, onClose, loading, structured, raw }: Summ
                 )}
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end flex-shrink-0">
                 <button onClick={onClose} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
                   Close
                 </button>
