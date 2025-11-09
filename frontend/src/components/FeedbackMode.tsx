@@ -16,7 +16,6 @@ interface FeedbackModeProps {
 export function FeedbackMode({ onBack }: FeedbackModeProps) {
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleMetricsUpdate = (newMetrics: CPRMetrics) => {
@@ -32,22 +31,8 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
   const startRecording = async (canvas: HTMLCanvasElement) => {
     try {
       await screenRecorder.startRecording(canvas);
-      setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
-    }
-  };
-
-  const handleSaveVideo = async () => {
-    try {
-      // Generate filename with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `cpr-recording-${timestamp}.webm`;
-      
-      await screenRecorder.downloadVideo(filename);
-    } catch (error) {
-      console.error('Failed to save video:', error);
-      alert('Failed to save video. Please try again.');
     }
   };
 
@@ -80,8 +65,6 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
           metrics={metrics}
           metronomeEnabled={metronomeEnabled}
           onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
-          onSaveVideo={handleSaveVideo}
-          isRecording={isRecording}
         />
       )}
 

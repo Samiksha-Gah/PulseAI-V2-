@@ -30,6 +30,7 @@ export function CameraFeed({ onMetricsUpdate, onCanvasReady }: CameraFeedProps) 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsInteraction, setNeedsInteraction] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment'); // Default to back camera
 
   const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
   const faceCascadeRef = useRef<any>(null);
@@ -509,6 +510,14 @@ export function CameraFeed({ onMetricsUpdate, onCanvasReady }: CameraFeedProps) 
   };
 
   /**
+   * Flip camera between front and back
+   */
+  const flipCamera = async () => {
+    const newFacingMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(newFacingMode);
+  };
+
+  /**
    * Initialize everything on mount
    */
   useEffect(() => {
@@ -618,6 +627,17 @@ export function CameraFeed({ onMetricsUpdate, onCanvasReady }: CameraFeedProps) 
         ref={canvasRef}
         className="w-full h-full object-contain"
       />
+      {/* Flip camera button */}
+      {isInitialized && (
+        <button
+          onClick={flipCamera}
+          className="absolute top-2 left-2 z-50 px-3 py-2 bg-gray-800/80 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold backdrop-blur-sm flex items-center gap-2"
+          aria-label="Flip camera"
+        >
+          <span className="text-lg">🔄</span>
+          <span className="hidden sm:inline">Flip Camera</span>
+        </button>
+      )}
       {!isInitialized && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
           <div className="text-center space-y-3">
