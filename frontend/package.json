@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@tensorflow-models/pose-detection": "^2.1.0",
     "@tensorflow/tfjs": "^4.15.0",
-    "@tensorflow/tfjs-core": "^4.15.0",
-    "@tensorflow/tfjs-converter": "^4.15.0",
     "@tensorflow/tfjs-backend-webgl": "^4.15.0",
+    "@tensorflow/tfjs-converter": "^4.15.0",
+    "@tensorflow/tfjs-core": "^4.15.0",
     "framer-motion": "^10.16.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -29,4 +31,3 @@
     "vite": "^5.0.8"
   }
 }
-

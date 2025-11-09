@@ -40,7 +40,7 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
     try {
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `cpr-recording-${timestamp}.webm`;
+      const filename = `cpr-recording-${timestamp}.mp4`;
       
       await screenRecorder.downloadVideo(filename);
     } catch (error) {

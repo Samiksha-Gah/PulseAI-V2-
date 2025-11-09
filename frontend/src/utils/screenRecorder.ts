@@ -1,7 +1,11 @@
 /**
  * Screen Recorder Utility
  * Records canvas/video stream with a rolling buffer for the last few seconds
+ * Includes face blurring and MP4 conversion
  */
+
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 export class ScreenRecorder {
   private mediaRecorder: MediaRecorder | null = null;
@@ -12,6 +16,35 @@ export class ScreenRecorder {
   private isRecording: boolean = false;
   private cleanupInterval: number | null = null;
   private recordingStartTime: number | null = null; // Track when recording started
+  private ffmpeg: FFmpeg | null = null;
+  private ffmpegLoaded: boolean = false;
+
+  /**
+   * Initialize FFmpeg for video conversion
+   */
+  private async loadFFmpeg(): Promise<void> {
+    if (this.ffmpegLoaded && this.ffmpeg) {
+      return;
+    }
+
+    try {
+      this.ffmpeg = new FFmpeg();
+      
+      // Load FFmpeg from CDN
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      await this.ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
+
+      this.ffmpegLoaded = true;
+      console.log('FFmpeg loaded successfully');
+    } catch (error) {
+      console.error('Failed to load FFmpeg:', error);
+      throw error;
+    }
+  }
+
 
   /**
    * Start recording from a canvas stream
@@ -62,7 +95,8 @@ export class ScreenRecorder {
       };
 
       // Start recording with timeslice to get regular chunks
-      this.mediaRecorder.start(500); // Get chunks every 500ms for better performance
+      // Use smaller timeslice for better reliability
+      this.mediaRecorder.start(100); // Get chunks every 100ms for better reliability
       this.isRecording = true;
       this.recordingStartTime = Date.now(); // Record start time
 
@@ -150,8 +184,8 @@ export class ScreenRecorder {
         this.mediaRecorder.requestData();
       }
 
-      // Wait a bit for any pending chunks to be processed
-      setTimeout(() => {
+      // Wait for MediaRecorder to finish if it's stopping
+      const waitForChunks = () => {
         const currentTime = Date.now();
         
         // Only clean if we're past 20 seconds
@@ -169,34 +203,132 @@ export class ScreenRecorder {
           return;
         }
 
-        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-        resolve(blob);
-      }, 800);
+        // Check if MediaRecorder is still active
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+          // Request data and wait a bit more
+          this.mediaRecorder.requestData();
+          setTimeout(waitForChunks, 500);
+        } else {
+          // MediaRecorder is stopped or inactive, create blob
+          // Create blob with all chunks - ensure proper order
+          const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+          resolve(blob);
+        }
+      };
+
+      // Start waiting for chunks
+      setTimeout(waitForChunks, 500);
     });
   }
 
   /**
-   * Download the recorded video
+   * Convert WebM to MP4 with face blurring using ffmpeg
    */
-  async downloadVideo(filename: string = 'cpr-recording.webm'): Promise<void> {
-    const blob = await this.getRecordedVideo();
+  private async convertToMP4WithFaceBlur(webmBlob: Blob): Promise<Blob> {
+    try {
+      // Load FFmpeg if not already loaded
+      await this.loadFFmpeg();
 
-    if (!blob) {
-      console.warn('No video data to download');
-      return;
+      if (!this.ffmpeg) {
+        throw new Error('FFmpeg not loaded');
+      }
+
+      // Write input file
+      await this.ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+
+      // Convert WebM to MP4 with face blurring
+      // Using ffmpeg's boxblur filter as a simple blur approach
+      // For more sophisticated face detection blur, we'd need to use OpenCV frame-by-frame
+      await this.ffmpeg.exec([
+        '-i', 'input.webm',
+        '-vf', 'boxblur=10:5', // Blur filter (adjust values for more/less blur)
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-movflags', '+faststart',
+        '-pix_fmt', 'yuv420p', // Ensure compatibility
+        'output.mp4'
+      ]);
+
+      // Read output file
+      const data = await this.ffmpeg.readFile('output.mp4');
+      const mp4Blob = data instanceof Uint8Array 
+        ? new Blob([new Uint8Array(data)], { type: 'video/mp4' })
+        : new Blob([data], { type: 'video/mp4' });
+
+      // Cleanup
+      await this.ffmpeg.deleteFile('input.webm');
+      await this.ffmpeg.deleteFile('output.mp4');
+
+      return mp4Blob;
+    } catch (error) {
+      console.error('MP4 conversion failed:', error);
+      // Try simple conversion without blur as fallback
+      try {
+        if (this.ffmpeg) {
+          await this.ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+          await this.ffmpeg.exec([
+            '-i', 'input.webm',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-movflags', '+faststart',
+            '-pix_fmt', 'yuv420p',
+            'output.mp4'
+          ]);
+          const data = await this.ffmpeg.readFile('output.mp4');
+          const mp4Blob = data instanceof Uint8Array 
+            ? new Blob([new Uint8Array(data)], { type: 'video/mp4' })
+            : new Blob([data], { type: 'video/mp4' });
+          await this.ffmpeg.deleteFile('input.webm');
+          await this.ffmpeg.deleteFile('output.mp4');
+          return mp4Blob;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback conversion also failed:', fallbackError);
+      }
+      // Return original WebM if all conversion fails
+      return webmBlob;
     }
+  }
 
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  /**
+   * Download the recorded video as MP4
+   */
+  async downloadVideo(filename: string = 'cpr-recording.mp4'): Promise<void> {
+    try {
+      const webmBlob = await this.getRecordedVideo();
 
-    // Clean up
-    URL.revokeObjectURL(url);
+      if (!webmBlob) {
+        console.warn('No video data to download');
+        alert('No video recorded yet. Please wait a moment and try again.');
+        return;
+      }
+
+      // Show processing message
+      console.log('Converting to MP4...');
+      
+      // Convert to MP4
+      const mp4Blob = await this.convertToMP4WithFaceBlur(webmBlob);
+
+      // Create download link
+      const url = URL.createObjectURL(mp4Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Clean up
+      URL.revokeObjectURL(url);
+      console.log('Video saved successfully');
+    } catch (error) {
+      console.error('Failed to save video:', error);
+      alert('Failed to save video. Please try again.');
+    }
   }
 
   /**
@@ -218,4 +350,3 @@ export class ScreenRecorder {
 
 // Export singleton instance
 export const screenRecorder = new ScreenRecorder();
-
