@@ -7,12 +7,15 @@ import { useEffect, useState } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { messagePrioritizer } from '../utils/messagePrioritizer';
 import { motion } from 'framer-motion';
+import { UploadMock } from './UploadMock';
 
 export interface FeedbackPanelProps {
   metrics: CPRMetrics;
+  metronomeEnabled?: boolean;
+  onMetronomeToggle?: () => void;
 }
 
-export function FeedbackPanel({ metrics }: FeedbackPanelProps) {
+export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
   const [prioritizedMessage, setPrioritizedMessage] = useState(
     messagePrioritizer.getCurrentMessage()
@@ -115,7 +118,7 @@ export function FeedbackPanel({ metrics }: FeedbackPanelProps) {
         </div>
       </motion.div>
 
-      {/* Unified Metrics Panel - Right side on desktop, bottom on mobile */}
+      {/* Data Panel - Middle/Bottom right */}
       <div className="fixed bottom-4 right-4 md:right-4 md:top-1/2 md:bottom-auto md:-translate-y-1/2 z-40 w-[calc(100%-2rem)] max-w-[280px] md:w-[280px]">
         <motion.div
           animate={{
@@ -132,6 +135,9 @@ export function FeedbackPanel({ metrics }: FeedbackPanelProps) {
           }}
           className="bg-black/70 backdrop-blur-lg rounded-2xl p-5 border-2 border-white/20 shadow-2xl"
         >
+          <div className="mb-4 pb-3 border-b border-white/20">
+            <h3 className="text-lg font-bold text-white uppercase tracking-wide">Data</h3>
+          </div>
           <div className="space-y-4">
             {/* Rate */}
             <div className="border-b border-white/10 pb-3">
@@ -225,6 +231,27 @@ export function FeedbackPanel({ metrics }: FeedbackPanelProps) {
               </div>
               <div className="text-xs text-gray-400">{placementFeedback.message}</div>
             </div>
+
+            {/* Metronome and Upload buttons */}
+            {onMetronomeToggle && (
+              <div className="pt-4 mt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Metronome toggle button */}
+                  <button
+                    onClick={onMetronomeToggle}
+                    className="px-3 py-2.5 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <span className="text-lg">{metronomeEnabled ? '🔊' : '🔇'}</span>
+                    <span className="text-xs">{metronomeEnabled ? 'ON' : 'OFF'}</span>
+                  </button>
+                  
+                  {/* Upload button */}
+                  <div className="w-full">
+                    <UploadMock />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

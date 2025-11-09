@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
-import { UploadMock } from './UploadMock';
 
 type WalkthroughStep =
   | 'welcome'
@@ -159,21 +158,19 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
       {showCamera ? (
         <>
           <CameraFeed onMetricsUpdate={handleMetricsUpdate} />
-          {metrics && <FeedbackPanel metrics={metrics} />}
+          {metrics && (
+            <FeedbackPanel
+              metrics={metrics}
+              metronomeEnabled={metronomeEnabled}
+              onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
+            />
+          )}
           <Metronome
             targetBPM={100}
             currentBPM={metrics?.bpm || 0}
             isActive={true}
             audioEnabled={metronomeEnabled}
           />
-          {/* Metronome toggle button */}
-          <button
-            onClick={() => setMetronomeEnabled(!metronomeEnabled)}
-            className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-gray-800/80 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold backdrop-blur-sm flex items-center gap-2"
-          >
-            <span>{metronomeEnabled ? '🔊' : '🔇'}</span>
-            <span>Metronome: {metronomeEnabled ? 'ON' : 'OFF'}</span>
-          </button>
         </>
       ) : (
         /* Instruction overlay */
@@ -209,8 +206,6 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
           </div>
         </div>
       )}
-
-      <UploadMock />
     </div>
   );
 }

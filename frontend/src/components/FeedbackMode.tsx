@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
-import { UploadMock } from './UploadMock';
 
 interface FeedbackModeProps {
   onBack: () => void;
@@ -15,6 +14,7 @@ interface FeedbackModeProps {
 
 export function FeedbackMode({ onBack }: FeedbackModeProps) {
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
 
   const handleMetricsUpdate = (newMetrics: CPRMetrics) => {
     setMetrics(newMetrics);
@@ -39,18 +39,21 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
       <CameraFeed onMetricsUpdate={handleMetricsUpdate} />
 
       {/* Feedback panel */}
-      {metrics && <FeedbackPanel metrics={metrics} />}
+      {metrics && (
+        <FeedbackPanel
+          metrics={metrics}
+          metronomeEnabled={metronomeEnabled}
+          onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
+        />
+      )}
 
-      {/* Metronome - visual only, no audio */}
+      {/* Metronome */}
       <Metronome
         targetBPM={100}
         currentBPM={metrics?.bpm || 0}
         isActive={true}
-        audioEnabled={false}
+        audioEnabled={metronomeEnabled}
       />
-
-      {/* Upload mock button */}
-      <UploadMock />
     </div>
   );
 }
