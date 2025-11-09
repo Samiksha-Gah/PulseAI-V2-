@@ -1,6 +1,6 @@
 /**
- * Feedback Mode Component
- * Real-time CPR feedback with live metrics
+ * EMT Mode Component
+ * Advanced real-time CPR feedback with live metrics for trained professionals
  */
 
 import { useState, useEffect, useRef } from 'react';

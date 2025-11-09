@@ -1,6 +1,6 @@
 /**
- * Walkthrough Mode Component
- * Step-by-step CPR instructions
+ * Bystander Mode Component
+ * Step-by-step CPR instructions with immediate camera analysis
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -23,9 +23,11 @@ interface WalkthroughModeProps {
 }
 
 export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughModeProps) {
-  const [currentStep, setCurrentStep] = useState<WalkthroughStep>('welcome');
+  const [currentStep, setCurrentStep] = useState<WalkthroughStep>('compressions'); // Start at compressions
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
   const [metronomeEnabled, setMetronomeEnabled] = useState(true);
+  const [showGuidance, setShowGuidance] = useState(true);
+  const [guidanceDismissed, setGuidanceDismissed] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Keep a ref to latest metrics for sampling (avoid stale closures)
@@ -171,70 +173,73 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
     };
   }, []);
 
-  const handleNext = () => {
-    const stepOrder: WalkthroughStep[] = [
-      'welcome',
-      'check',
-      'call',
-      'position',
-      'compressions',
-      'breaths',
-      'continue',
-    ];
-    const currentIndex = stepOrder.indexOf(currentStep);
-    if (currentIndex < stepOrder.length - 1) {
-      setCurrentStep(stepOrder[currentIndex + 1]);
+
+  // Auto-dismiss guidance after 10 seconds
+  useEffect(() => {
+    if (showGuidance && !guidanceDismissed) {
+      const timer = setTimeout(() => {
+        setShowGuidance(false);
+      }, 10000);
+      return () => clearTimeout(timer);
     }
+  }, [showGuidance, guidanceDismissed]);
+
+  const handleDismissGuidance = () => {
+    setShowGuidance(false);
+    setGuidanceDismissed(true);
   };
 
-  const handlePrevious = () => {
-    const stepOrder: WalkthroughStep[] = [
-      'welcome',
-      'check',
-      'call',
-      'position',
-      'compressions',
-      'breaths',
-      'continue',
-    ];
-    const currentIndex = stepOrder.indexOf(currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(stepOrder[currentIndex - 1]);
-    }
+  // Create combined guidance for Bystander Mode with 3 segments
+  const bystanderGuidance = {
+    title: 'CPR Steps',
+    segments: [
+      {
+        title: '1. Check Responsiveness',
+        instructions: [
+          'Tap the person\'s shoulder firmly',
+          'Shout "Are you okay?" loudly',
+          'Check for breathing and movement',
+          'If no response, proceed to next step'
+        ]
+      },
+      {
+        title: '2. Call for Help',
+        instructions: [
+          'Call 911 immediately',
+          'Get an AED if available',
+          'Send someone to find help if others are nearby',
+          'Put phone on speaker if alone'
+        ]
+      },
+      {
+        title: '3. Start Chest Compressions',
+        instructions: [
+          'Place hands in center of chest',
+          'Compress hard and fast (100-120 BPM)',
+          'Compress 2 inches deep',
+          'Let chest fully rebound between compressions',
+          'Continue until help arrives'
+        ]
+      }
+    ]
   };
-
-  const step = steps[currentStep];
-  const showCamera = currentStep === 'compressions' || (currentStep as WalkthroughStep) === 'continue';
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Skip button */}
-      {currentStep !== 'compressions' && currentStep !== 'continue' && (
-        <button
-          onClick={onSkipToCompressions}
-          className="absolute top-2 right-2 z-50 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold backdrop-blur-sm"
-        >
-          Skip to Compressions
-        </button>
-      )}
-
-      {/* Back button when in practice */}
-      {showCamera && (
+      {/* Back button */}
         <button
           onClick={onBack}
           className="absolute top-2 right-2 z-50 px-4 py-2 bg-gray-800/80 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold backdrop-blur-sm"
         >
           Back to Menu
         </button>
-      )}
 
-      {/* Camera view (only during compressions) */}
-      {showCamera ? (
-        <>
+      {/* Camera view - always visible */}
           <CameraFeed 
             onMetricsUpdate={handleMetricsUpdate}
             onCanvasReady={handleCanvasReady}
           />
+      
           {metrics && (
             <FeedbackPanel
               metrics={metrics}
@@ -243,43 +248,84 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
               onSaveVideo={handleSaveVideo}
             />
           )}
+      
           <Metronome
             targetBPM={100}
             currentBPM={metrics?.bpm || 0}
             isActive={true}
             audioEnabled={metronomeEnabled}
           />
-        </>
-      ) : (
-        /* Instruction overlay */
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-30 flex items-center justify-center p-4">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl w-full border-2 border-white/20">
-            <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold text-white mb-4">{step.title}</h2>
-              <div className="space-y-3 text-left">
-                {step.instructions.map((instruction, index) => (
-                  <div key={index} className="flex items-start gap-3 text-blue-100">
-                    <span className="text-blue-400 font-bold mt-1">{index + 1}.</span>
-                    <p className="flex-1">{instruction}</p>
+
+      {/* Guidance panel - left side on desktop, overlay on mobile */}
+      {showGuidance && (
+        <div className="absolute left-0 top-0 bottom-0 md:w-80 w-full md:max-w-sm z-40 flex flex-col p-4 md:p-6">
+          {/* Desktop: Semi-transparent box on left */}
+          <div className="hidden md:block bg-black/70 backdrop-blur-lg rounded-2xl p-4 border-2 border-white/20 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-bold text-white">{bystanderGuidance.title}</h2>
+              <button
+                onClick={handleDismissGuidance}
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="Close guidance"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3 text-white">
+              {bystanderGuidance.segments.map((segment, segmentIndex) => (
+                <div key={segmentIndex} className="border-b border-white/10 pb-2.5 last:border-b-0 last:pb-0">
+                  <h3 className="text-sm font-semibold text-blue-300 mb-1.5">{segment.title}</h3>
+                  <div className="space-y-1">
+                    {segment.instructions.map((instruction, index) => (
+                      <div key={index} className="flex items-start gap-1.5">
+                        <span className="text-blue-400 font-bold mt-0.5 flex-shrink-0 text-xs">•</span>
+                        <p className="flex-1 text-blue-100 text-xs leading-tight">{instruction}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
 
-            <div className="flex justify-between mt-8">
+            <div className="mt-3 pt-2 border-t border-white/20">
+              <p className="text-[10px] text-gray-400 text-center">
+                Auto-hides in 10s, or click X to dismiss
+              </p>
+            </div>
+          </div>
+
+          {/* Mobile: Overlay */}
+          <div className="md:hidden bg-black/90 backdrop-blur-lg rounded-2xl p-4 border-2 border-white/20 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">{bystanderGuidance.title}</h2>
               <button
-                onClick={handlePrevious}
-                disabled={currentStep === 'welcome'}
-                className="px-6 py-3 bg-white/10 text-white rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={handleDismissGuidance}
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="Close guidance"
               >
-                Previous
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-              <button
-                onClick={handleNext}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                {currentStep === 'continue' as WalkthroughStep ? 'Start Practice' : 'Next Step'}
-              </button>
+            </div>
+            
+            <div className="space-y-3 text-white">
+              {bystanderGuidance.segments.map((segment, segmentIndex) => (
+                <div key={segmentIndex} className="border-b border-white/10 pb-2.5 last:border-b-0 last:pb-0">
+                  <h3 className="text-sm font-semibold text-blue-300 mb-1.5">{segment.title}</h3>
+                  <div className="space-y-1">
+                    {segment.instructions.map((instruction, index) => (
+                      <div key={index} className="flex items-start gap-1.5">
+                        <span className="text-blue-400 font-bold mt-0.5 flex-shrink-0 text-xs">•</span>
+                        <p className="flex-1 text-blue-100 text-xs leading-tight">{instruction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 /**
  * Mode Selection Screen
- * Allows user to choose between Walkthrough Mode and Feedback Mode
+ * Allows user to choose between Bystander Mode and EMT Mode
  */
 
 interface ModeSelectionProps {
@@ -41,10 +41,10 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">Walkthrough Mode</h2>
+              <h2 className="text-2xl font-bold text-white mb-3">Bystander Mode</h2>
               <p className="text-blue-200 text-sm leading-relaxed">
-                Step-by-step CPR instructions with guided practice. Perfect for beginners learning
-                proper CPR technique.
+                Learn CPR basics with step-by-step guidance. Ideal for first-time responders who need
+                clear instructions during an emergency.
               </p>
             </div>
           </button>
@@ -70,10 +70,10 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">Feedback Mode</h2>
+              <h2 className="text-2xl font-bold text-white mb-3">EMT Mode</h2>
               <p className="text-blue-200 text-sm leading-relaxed">
-                Real-time CPR feedback with live metrics. Perfect for practicing and improving your
-                CPR technique.
+                Advanced real-time CPR analysis with detailed metrics. Designed for trained professionals
+                to refine technique and maintain certification standards.
               </p>
             </div>
           </button>
