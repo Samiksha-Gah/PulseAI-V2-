@@ -133,7 +133,7 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-          className="bg-black/70 backdrop-blur-lg rounded-t-2xl md:rounded-2xl p-3 md:p-5 border-t-2 md:border-2 border-white/20 shadow-2xl"
+          className="bg-black/70 backdrop-blur-lg rounded-t-2xl md:rounded-2xl p-2 md:p-5 border-t-2 md:border-2 border-white/20 shadow-2xl"
         >
           {/* Warning notification - only show on desktop */}
           <div className="hidden md:block mb-4 pb-3 bg-red-500/30 rounded-lg px-3 py-2 border border-red-500/50">
@@ -265,111 +265,106 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
           {/* Mobile: Compressed bottom bar layout */}
           <div className="md:hidden">
             {/* Warning notification at top - red section above dashboard */}
-            <div className="mb-3 pb-2 bg-red-500/40 rounded-lg px-3 py-2 border-2 border-red-500/60">
-              <p className="text-xs font-bold text-white text-center">Training app—call 911 in real emergencies</p>
+            <div className="mb-2 pb-1.5 bg-red-500/40 rounded-lg px-2 py-1.5 border-2 border-red-500/60">
+              <p className="text-[10px] font-bold text-white text-center">Training app—call 911 in real emergencies</p>
             </div>
             
             {/* Main data grid: 2 columns */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-2 gap-1.5 mb-1.5">
               {/* Left Column: Rate */}
-              <div className="border-r border-white/10 pr-2">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold block mb-1">Rate</span>
-                <div className="text-lg font-bold text-white mb-0.5">{bpm || '--'} BPM</div>
-                <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded block ${
-                    rateFeedback.color === 'green'
-                      ? 'bg-green-500/30 text-green-300'
-                      : rateFeedback.color === 'orange'
-                      ? 'bg-orange-500/30 text-orange-300'
-                      : 'bg-red-500/30 text-red-300'
-                  }`}
-                >
-                  {rateFeedback.color === 'green' ? 'Good' : rateFeedback.color === 'orange' ? 'Warning' : 'Critical'}
-                </span>
+              <div className="border-r border-white/10 pr-1.5">
+                <span className="text-[9px] text-gray-400 uppercase tracking-wide font-semibold block mb-0.5">Rate</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="text-base font-bold text-white">{bpm || '--'} BPM</div>
+                  <span
+                    className={`text-[8px] px-1 py-0.5 rounded ${
+                      rateFeedback.color === 'green'
+                        ? 'bg-green-500/30 text-green-300'
+                        : rateFeedback.color === 'orange'
+                        ? 'bg-orange-500/30 text-orange-300'
+                        : 'bg-red-500/30 text-red-300'
+                    }`}
+                  >
+                    {rateFeedback.color === 'green' ? 'Good' : rateFeedback.color === 'orange' ? 'Warning' : 'Critical'}
+                  </span>
+                </div>
               </div>
 
               {/* Right Column: Depth */}
-              <div className="pl-2">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold block mb-1">Depth</span>
-                <div className="text-lg font-bold text-white mb-0.5">{depthMm || '--'}mm</div>
-                <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded block ${
-                    depthFeedback.color === 'green'
-                      ? 'bg-green-500/30 text-green-300'
-                      : depthFeedback.color === 'orange'
-                      ? 'bg-orange-500/30 text-orange-300'
-                      : 'bg-red-500/30 text-red-300'
-                  }`}
-                >
-                  {depthFeedback.color === 'green' ? 'Good' : depthFeedback.color === 'orange' ? 'Warning' : 'Critical'}
-                </span>
+              <div className="pl-1.5">
+                <span className="text-[9px] text-gray-400 uppercase tracking-wide font-semibold block mb-0.5">Depth</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="text-base font-bold text-white">{depthMm || '--'}mm</div>
+                  <span
+                    className={`text-[8px] px-1 py-0.5 rounded ${
+                      depthFeedback.color === 'green'
+                        ? 'bg-green-500/30 text-green-300'
+                        : depthFeedback.color === 'orange'
+                        ? 'bg-orange-500/30 text-orange-300'
+                        : 'bg-red-500/30 text-red-300'
+                    }`}
+                  >
+                    {depthFeedback.color === 'green' ? 'Good' : depthFeedback.color === 'orange' ? 'Warning' : 'Critical'}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Second row: Compression and Placement */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-2 gap-1.5 mb-1.5">
               {/* Left Column: Compression */}
-              <div className="border-r border-white/10 pr-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Compressions</span>
+              <div className="border-r border-white/10 pr-1.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[9px] text-gray-400 uppercase tracking-wide font-semibold">Compressions</span>
                   {isComplete && (
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/30 text-green-300">
+                    <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/30 text-green-300">
                       Done
                     </span>
                   )}
                 </div>
-                <div className="text-lg font-bold text-white mb-1">
-                  <span className={isComplete ? 'text-green-400' : 'text-blue-400'}>
-                    {compressionCount}
-                  </span>
-                  <span className="text-gray-500 text-sm">/30</span>
-                </div>
-                {/* Progress bar */}
-                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      isComplete ? 'bg-green-500' : 'bg-blue-500'
-                    }`}
-                    style={{ width: `${compressionProgress}%` }}
-                  />
+                <div className="flex items-center gap-1.5">
+                  <div className="text-base font-bold text-white">
+                    <span className={isComplete ? 'text-green-400' : 'text-blue-400'}>
+                      {compressionCount}
+                    </span>
+                    <span className="text-gray-500 text-xs">/30</span>
+                  </div>
+                  {/* Progress bar inline */}
+                  <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        isComplete ? 'bg-green-500' : 'bg-blue-500'
+                      }`}
+                      style={{ width: `${compressionProgress}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Right Column: Placement */}
-              <div className="pl-2">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold block mb-1">Placement</span>
+              <div className="pl-1.5">
+                <span className="text-[9px] text-gray-400 uppercase tracking-wide font-semibold block mb-0.5">Placement</span>
                 <div
-                  className={`text-base font-semibold mb-0.5 ${
+                  className={`text-sm font-semibold mb-0.5 ${
                     placement === 'Good' ? 'text-green-400' : 'text-orange-400'
                   }`}
                 >
                   {placement}
                 </div>
-                <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded block mb-0.5 ${
-                    placementFeedback.color === 'green'
-                      ? 'bg-green-500/30 text-green-300'
-                      : placementFeedback.color === 'orange'
-                      ? 'bg-orange-500/30 text-orange-300'
-                      : 'bg-red-500/30 text-red-300'
-                  }`}
-                >
-                  {placement === 'Good' ? 'Good' : 'Off-center'}
-                </span>
-                <div className="text-[9px] text-gray-400 line-clamp-1">{placementFeedback.message}</div>
+                <div className="text-[8px] text-gray-400 line-clamp-1">{placementFeedback.message}</div>
               </div>
             </div>
 
             {/* Buttons: Separate columns */}
             {onMetronomeToggle && (
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/20">
+              <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-white/20">
                 {/* Metronome toggle button */}
                 <button
                   onClick={onMetronomeToggle}
-                  className="px-2 py-1.5 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-xs flex items-center justify-center gap-1"
+                  className="px-2 py-1 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
                 >
-                  <span className="text-base">{metronomeEnabled ? '🔊' : '🔇'}</span>
-                  <span className="text-[10px]">{metronomeEnabled ? 'ON' : 'OFF'}</span>
+                  <span className="text-sm">{metronomeEnabled ? '🔊' : '🔇'}</span>
+                  <span className="text-[9px]">{metronomeEnabled ? 'ON' : 'OFF'}</span>
                 </button>
                 
                 {/* Upload button */}
