@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
-import { screenRecorder } from '../utils/screenRecorder';
+// Recording of video removed. We now sample metrics per-second and export JSON.
 import { audioFeedback } from '../utils/audioFeedback';
 
 interface FeedbackModeProps {
@@ -30,6 +30,44 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
     
     // Process audio notifications based on metrics
     processAudioFeedback(newMetrics);
+  };
+
+  // Keep a ref to latest metrics for sampling (avoid stale closures)
+  const metricsRef = useRef<CPRMetrics | null>(null);
+  useEffect(() => {
+    metricsRef.current = metrics;
+  }, [metrics]);
+
+  // Recorded data (one entry per second): { time, iso, metrics }
+  const recordedDataRef = useRef<Array<{ time: number; iso: string; metrics: CPRMetrics | null }>>([]);
+  const samplingIntervalRef = useRef<number | null>(null);
+
+  const startSampling = () => {
+    // Don't start if already sampling
+    if (samplingIntervalRef.current !== null) return;
+
+    // Push an immediate sample
+    recordedDataRef.current.push({
+      time: Date.now(),
+      iso: new Date().toISOString(),
+      metrics: metricsRef.current || null,
+    });
+
+    // Sample every 1000ms
+    samplingIntervalRef.current = window.setInterval(() => {
+      recordedDataRef.current.push({
+        time: Date.now(),
+        iso: new Date().toISOString(),
+        metrics: metricsRef.current || null,
+      });
+    }, 1000) as unknown as number;
+  };
+
+  const stopSampling = () => {
+    if (samplingIntervalRef.current !== null) {
+      clearInterval(samplingIntervalRef.current);
+      samplingIntervalRef.current = null;
+    }
   };
 
   // Process audio notifications with throttling and debouncing
@@ -128,35 +166,41 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
 
   const handleCanvasReady = (canvas: HTMLCanvasElement) => {
     canvasRef.current = canvas;
-    // Start recording automatically when canvas is ready
-    startRecording(canvas);
-  };
-
-  const startRecording = async (canvas: HTMLCanvasElement) => {
-    try {
-      await screenRecorder.startRecording(canvas);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-    }
+    // Start per-second metrics sampling automatically when canvas is ready
+    startSampling();
   };
 
   const handleSaveVideo = async () => {
     try {
-      // Generate filename with timestamp
+      // Download JSON of per-second sampled metrics
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `cpr-recording-${timestamp}.webm`;
-      
-      await screenRecorder.downloadVideo(filename);
+      const filename = `cpr-metrics-${timestamp}.json`;
+
+      const data = recordedDataRef.current;
+      if (!data || data.length === 0) {
+        alert('No metrics recorded yet');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), samples: data }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to save video:', error);
-      alert('Failed to save video. Please try again.');
+      console.error('Failed to save metrics JSON:', error);
+      alert('Failed to save metrics. Please try again.');
     }
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      screenRecorder.stopRecording();
+      stopSampling();
       audioFeedback.clearQueue();
     };
   }, []);
