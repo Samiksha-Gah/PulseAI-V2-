@@ -93,16 +93,12 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
           />
         </motion.div>
 
-        {/* BPM indicator */}
-        <div className="mt-2 text-center">
-          <div className="text-xs text-gray-300 mb-1">Target: {targetBPM} BPM</div>
-          <div className="text-sm font-semibold text-white">
-            Current: {currentBPM || '--'} BPM
+        {/* Audio indicator only */}
+        {audioEnabled && (
+          <div className="mt-2 text-center">
+            <div className="text-xs text-blue-400">Audio: ON</div>
           </div>
-          {audioEnabled && (
-            <div className="text-xs text-blue-400 mt-1">Audio: ON</div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

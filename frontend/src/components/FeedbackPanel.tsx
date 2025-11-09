@@ -135,6 +135,11 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
           }}
           className="bg-black/70 backdrop-blur-lg rounded-2xl p-5 border-2 border-white/20 shadow-2xl"
         >
+          {/* Warning notification at top */}
+          <div className="mb-4 pb-3 bg-red-500/30 rounded-lg px-3 py-2 border border-red-500/50">
+            <p className="text-xs font-bold text-white">Training app—call 911 in real emergencies</p>
+          </div>
+          
           <div className="mb-4 pb-3 border-b border-white/20">
             <h3 className="text-lg font-bold text-white uppercase tracking-wide">Data</h3>
           </div>

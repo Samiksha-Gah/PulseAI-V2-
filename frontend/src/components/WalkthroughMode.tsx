@@ -129,11 +129,6 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Warning text - top left */}
-      <div className="absolute top-2 left-2 z-50 text-red-500 text-xs font-semibold">
-        Training app—call 911 in real emergencies
-      </div>
-
       {/* Skip button */}
       {currentStep !== 'compressions' && currentStep !== 'continue' && (
         <button

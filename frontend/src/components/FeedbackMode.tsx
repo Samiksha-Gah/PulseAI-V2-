@@ -22,11 +22,6 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Warning text - top left */}
-      <div className="absolute top-2 left-2 z-50 text-red-500 text-xs font-semibold">
-        Training app—call 911 in real emergencies
-      </div>
-
       {/* Back button */}
       <button
         onClick={onBack}
