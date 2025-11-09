@@ -494,7 +494,8 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
     const init = async () => {
       try {
         await initializeTensorFlow();
-        await initializeOpenCV();
+        // Load OpenCV in parallel; don't block camera start
+        initializeOpenCV().catch((e) => console.warn('OpenCV init (non-blocking) failed:', e));
         await initializeCamera();
       } catch (err) {
         console.error('Initialization error:', err);
@@ -536,6 +537,17 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
     };
   }, []);
 
+  // Watchdog: if not initialized within 4 seconds and no error, show retry button
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isInitialized && !error) {
+        console.warn('Camera initialization taking too long, showing retry button');
+        setNeedsInteraction(true);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isInitialized, error]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
@@ -554,7 +566,7 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
         autoPlay
         playsInline
         muted
-        className="hidden"
+        className="absolute w-px h-px opacity-0 pointer-events-none"
       />
       <canvas
         ref={blurCanvasRef}
