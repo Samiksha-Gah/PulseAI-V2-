@@ -1,6 +1,6 @@
 # PulseAI: AI-Powered CPR Training Assistant
 
-[![Build Status]](https://pulseai-v2.onrender.com/)
+[![Build Status](frontend/public/pulseai-logo.png](https://pulseai-v2.onrender.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-18.2.0-blue)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
