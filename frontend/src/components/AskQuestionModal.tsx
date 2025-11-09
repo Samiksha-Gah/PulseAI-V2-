@@ -247,11 +247,12 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
           errorDetails = ` - Server returned non-JSON response: ${responseText?.substring(0, 100)}`;
         }
         
-        // Combine error message
-        const fullErrorMessage = `${errorMessage}${errorDetails}`;
-        console.error('[AskQuestionModal] Full error message:', fullErrorMessage);
-        // Include a user friendly message along with the technical error so the variable is used
-        throw new Error(`${fullErrorMessage} - ${userFriendlyMessage}`);
+  // Combine error message
+  const fullErrorMessage = `${errorMessage}${errorDetails}`;
+  console.error('[AskQuestionModal] Full error message:', fullErrorMessage);
+  // Include a user friendly message along with the technical error
+  const userFriendlyMessage = 'An error occurred while processing your question. Please try again.';
+  throw new Error(`${fullErrorMessage} - ${userFriendlyMessage}`);
       }
 
       // Response is OK - check if it's audio or JSON
