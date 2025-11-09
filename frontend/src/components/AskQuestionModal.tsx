@@ -164,23 +164,17 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
         
         // Categorize error by status code
         let errorType = 'UNKNOWN_ERROR';
-        let userFriendlyMessage = 'Something went wrong. Please try again.';
         
         if (status === 404) {
           errorType = 'ROUTE_NOT_FOUND';
-          userFriendlyMessage = 'The question service is not available. The backend endpoint may be missing or misconfigured.';
         } else if (status === 400) {
           errorType = 'BAD_REQUEST';
-          userFriendlyMessage = 'Invalid question format. Please try rephrasing your question.';
         } else if (status === 401 || status === 403) {
           errorType = 'AUTH_ERROR';
-          userFriendlyMessage = 'Authentication failed. Please check API key configuration.';
         } else if (status === 500) {
           errorType = 'SERVER_ERROR';
-          userFriendlyMessage = 'The AI service encountered an error. Please try again in a moment.';
         } else if (status === 503) {
           errorType = 'SERVICE_UNAVAILABLE';
-          userFriendlyMessage = 'The AI service is temporarily unavailable. Please try again later.';
         }
         
         let errorMessage = `ERROR_CODE: HTTP_${status}_${errorType}`;
@@ -200,42 +194,23 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initia
             // BUT: Don't override errorType for 404 - 404 should always be ROUTE_NOT_FOUND
             if (backendErrorType && status !== 404) {
               errorType = backendErrorType;
-              // Map error types to user-friendly messages
-              if (errorType === 'ROUTE_NOT_FOUND') {
-                userFriendlyMessage = 'The question endpoint was not found. Please check backend configuration.';
-              } else if (errorType === 'API_KEY_MISSING' || errorType === 'API_KEY_INVALID') {
-                userFriendlyMessage = 'API key is not configured or invalid. Please check backend configuration.';
-              } else if (errorType === 'AI_EMPTY_RESPONSE' || errorType === 'AI_INVALID_RESPONSE') {
-                userFriendlyMessage = 'The AI service returned an invalid response. Please try rephrasing your question.';
-              } else if (errorType === 'OPENAI_API_ERROR' || errorType === 'OPENAI_SERVICE_UNAVAILABLE') {
-                userFriendlyMessage = 'OpenAI API request failed. Please check API key and try again.';
-              } else if (errorType === 'RATE_LIMIT_EXCEEDED') {
-                userFriendlyMessage = 'Rate limit exceeded. Please wait a moment and try again.';
-              } else if (errorType === 'SERVER_ERROR') {
-                userFriendlyMessage = 'The server encountered an error. Please try again.';
-              }
+              // Map error types (userFriendlyMessage was unused, removed)
             } else if (backendError.includes('AI response failed') && status !== 404) {
               // Fallback: Determine specific error subtype from error message
               if (backendError.includes('empty answer')) {
                 errorType = 'AI_EMPTY_RESPONSE';
-                userFriendlyMessage = 'The AI service returned an empty response. Please try rephrasing your question.';
               } else if (backendError.includes('invalid answer')) {
                 errorType = 'AI_INVALID_RESPONSE';
-                userFriendlyMessage = 'The AI service returned an invalid response. Please try again.';
               } else {
                 errorType = 'AI_RESPONSE_FAILED';
-                userFriendlyMessage = 'The AI service failed to generate a response. Please try again.';
               }
             } else if (backendError.includes('API key') && status !== 404) {
               errorType = 'API_KEY_MISSING';
-              userFriendlyMessage = 'API key is not configured. Please check backend configuration.';
             } else if (backendError.includes('OpenAI API failed') && status !== 404) {
               errorType = 'OPENAI_API_ERROR';
-              userFriendlyMessage = 'OpenAI API request failed. Please check API key and try again.';
             } else if (backendError.includes('Route not found') || status === 404) {
               // 404 should always be ROUTE_NOT_FOUND
               errorType = 'ROUTE_NOT_FOUND';
-              userFriendlyMessage = 'The question endpoint was not found. Please check backend configuration.';
             }
             
             errorMessage = `ERROR_CODE: HTTP_${status}_${errorType}`;

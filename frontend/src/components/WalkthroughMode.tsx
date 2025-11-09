@@ -22,8 +22,8 @@ interface WalkthroughModeProps {
   onBack: () => void;
 }
 
-export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughModeProps) {
-  const [currentStep, setCurrentStep] = useState<WalkthroughStep>('compressions'); // Start at compressions
+export function WalkthroughMode({ onSkipToCompressions: _onSkipToCompressions, onBack }: WalkthroughModeProps) {
+  const [_currentStep, _setCurrentStep] = useState<WalkthroughStep>('compressions'); // Start at compressions
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
   const [metronomeEnabled, setMetronomeEnabled] = useState(true);
   const [showGuidance, setShowGuidance] = useState(true);
@@ -68,66 +68,7 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
     }
   };
 
-  const steps: Record<WalkthroughStep, { title: string; instructions: string[] }> = {
-    welcome: {
-      title: 'CPR Training',
-      instructions: [
-        'Learn proper CPR step by step',
-        'Follow the instructions on each screen',
-        'Click "Next Step" to continue',
-      ],
-    },
-    check: {
-      title: 'Check Responsiveness',
-      instructions: [
-        'Tap their shoulder',
-        'Shout "Are you okay?"',
-        'If no response, continue',
-      ],
-    },
-    call: {
-      title: 'Call 911',
-      instructions: [
-        'Call 911 immediately',
-        'Get an AED if available',
-        'Start CPR right away',
-      ],
-    },
-    position: {
-      title: 'Hand Position',
-      instructions: [
-        'Place hands in center of chest',
-        'One hand on top of the other',
-        'Keep arms straight',
-      ],
-    },
-    compressions: {
-      title: 'Perform Compressions',
-      instructions: [
-        'Compress hard and fast',
-        'Aim for 120 compressions per minute',
-        'Compress 2 inches deep',
-        'Let chest fully rebound',
-      ],
-    },
-    breaths: {
-      title: 'Rescue Breaths (Optional)',
-      instructions: [
-        'After 30 compressions, give 2 breaths',
-        'Tilt head back, lift chin',
-        'Pinch nose and breathe for 1 second',
-        'If not trained, continue hands-only CPR',
-      ],
-    },
-    continue: {
-      title: 'Continue CPR',
-      instructions: [
-        'Keep doing 30 compressions',
-        'Give 2 breaths if trained',
-        'Continue until help arrives',
-      ],
-    },
-  };
+  // Steps definition removed - unused in current implementation
 
   const handleMetricsUpdate = (newMetrics: CPRMetrics) => {
     setMetrics(newMetrics);
