@@ -235,9 +235,9 @@ export class ScreenRecorder {
   }
 
   /**
-   * Convert WebM to MP4 with face blurring using ffmpeg
+   * Convert WebM to MP4 using ffmpeg
    */
-  private async convertToMP4WithFaceBlur(webmBlob: Blob): Promise<Blob> {
+  private async convertToMP4(webmBlob: Blob): Promise<Blob> {
     try {
       // Load FFmpeg if not already loaded
       await this.loadFFmpeg();
@@ -249,12 +249,9 @@ export class ScreenRecorder {
       // Write input file
       await this.ffmpeg.writeFile('input.webm', await fetchFileFunc(webmBlob));
 
-      // Convert WebM to MP4 with face blurring
-      // Using ffmpeg's boxblur filter as a simple blur approach
-      // For more sophisticated face detection blur, we'd need to use OpenCV frame-by-frame
+      // Convert WebM to MP4 (no blur)
       await this.ffmpeg.exec([
         '-i', 'input.webm',
-        '-vf', 'boxblur=10:5', // Blur filter (adjust values for more/less blur)
         '-c:v', 'libx264',
         '-c:a', 'aac',
         '-preset', 'fast',
@@ -277,88 +274,69 @@ export class ScreenRecorder {
       return mp4Blob;
     } catch (error) {
       console.error('MP4 conversion failed:', error);
-      // Try simple conversion without blur as fallback
-      try {
-        if (this.ffmpeg) {
-          await this.ffmpeg.writeFile('input.webm', await fetchFileFunc(webmBlob));
-          await this.ffmpeg.exec([
-            '-i', 'input.webm',
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-preset', 'fast',
-            '-crf', '23',
-            '-movflags', '+faststart',
-            '-pix_fmt', 'yuv420p',
-            'output.mp4'
-          ]);
-          const data = await this.ffmpeg.readFile('output.mp4');
-          const mp4Blob = data instanceof Uint8Array 
-            ? new Blob([new Uint8Array(data)], { type: 'video/mp4' })
-            : new Blob([data], { type: 'video/mp4' });
-          await this.ffmpeg.deleteFile('input.webm');
-          await this.ffmpeg.deleteFile('output.mp4');
-          return mp4Blob;
-        }
-      } catch (fallbackError) {
-        console.error('Fallback conversion also failed:', fallbackError);
-      }
-      // Return original WebM if all conversion fails
+      // Return original WebM if conversion fails
       return webmBlob;
     }
   }
 
   /**
-   * Download the recorded video as MP4
+   * Download the recorded video as MP4 (non-blocking)
    */
   async downloadVideo(filename: string = 'cpr-recording.mp4'): Promise<void> {
-    try {
-      const webmBlob = await this.getRecordedVideo();
-
-      if (!webmBlob) {
-        console.warn('No video data to download');
-        alert('No video recorded yet. Please wait a moment and try again.');
-        return;
-      }
-
-      // Show processing message
-      console.log('Converting to MP4...');
-      
-      // Try to convert to MP4, fallback to WebM if conversion fails
-      let finalBlob = webmBlob;
-      let finalFilename = filename;
-      
-      try {
-        const mp4Blob = await this.convertToMP4WithFaceBlur(webmBlob);
-        // Check if conversion actually worked (not the original WebM)
-        if (mp4Blob.type === 'video/mp4') {
-          finalBlob = mp4Blob;
-          finalFilename = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
-        } else {
-          // Conversion failed, use WebM
-          finalFilename = filename.replace(/\.mp4$/, '.webm');
-          console.warn('MP4 conversion failed, saving as WebM');
-        }
-      } catch (conversionError) {
-        console.warn('MP4 conversion failed, saving as WebM:', conversionError);
-        finalFilename = filename.replace(/\.mp4$/, '.webm');
-      }
-
-      // Create download link
-      const url = URL.createObjectURL(finalBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = finalFilename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // Clean up
-      URL.revokeObjectURL(url);
-      console.log('Video saved successfully');
-    } catch (error) {
+    // Don't block - process in background
+    this.processAndDownloadVideo(filename).catch((error) => {
       console.error('Failed to save video:', error);
       alert('Failed to save video. Please try again.');
+    });
+  }
+
+  /**
+   * Process and download video (runs in background)
+   */
+  private async processAndDownloadVideo(filename: string): Promise<void> {
+    const webmBlob = await this.getRecordedVideo();
+
+    if (!webmBlob) {
+      console.warn('No video data to download');
+      alert('No video recorded yet. Please wait a moment and try again.');
+      return;
     }
+
+    // Show processing message (non-blocking)
+    console.log('Converting to MP4...');
+    
+    // Try to convert to MP4, fallback to WebM if conversion fails
+    let finalBlob = webmBlob;
+    let finalFilename = filename;
+    
+    try {
+      const mp4Blob = await this.convertToMP4(webmBlob);
+      // Check if conversion actually worked (not the original WebM)
+      if (mp4Blob.type === 'video/mp4') {
+        finalBlob = mp4Blob;
+        finalFilename = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
+      } else {
+        // Conversion failed, use WebM
+        finalFilename = filename.replace(/\.mp4$/, '.webm');
+        console.warn('MP4 conversion failed, saving as WebM');
+      }
+    } catch (conversionError) {
+      console.warn('MP4 conversion failed, saving as WebM:', conversionError);
+      finalFilename = filename.replace(/\.mp4$/, '.webm');
+    }
+
+    // Create download link
+    const url = URL.createObjectURL(finalBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Clean up
+    URL.revokeObjectURL(url);
+    console.log('Video saved successfully');
   }
 
   /**

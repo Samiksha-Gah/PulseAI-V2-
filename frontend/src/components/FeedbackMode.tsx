@@ -36,17 +36,16 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
     }
   };
 
-  const handleSaveVideo = async () => {
-    try {
-      // Generate filename with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `cpr-recording-${timestamp}.mp4`;
-      
-      await screenRecorder.downloadVideo(filename);
-    } catch (error) {
+  const handleSaveVideo = () => {
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `cpr-recording-${timestamp}.mp4`;
+    
+    // Don't await - let it process in background, button stays responsive
+    screenRecorder.downloadVideo(filename).catch((error) => {
       console.error('Failed to save video:', error);
       alert('Failed to save video. Please try again.');
-    }
+    });
   };
 
   // Cleanup on unmount
