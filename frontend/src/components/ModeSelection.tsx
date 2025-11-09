@@ -9,12 +9,19 @@ interface ModeSelectionProps {
 
 export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-white to-red-100 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4">PulseAI</h1>
-          <p className="text-xl text-blue-200">CPR Training Assistant</p>
-          <p className="text-sm text-red-400 mt-4 font-semibold">
+          {/* Logo Image */}
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/pulseai-logo.png" 
+              alt="PulseAI" 
+              className="h-32 md:h-40 w-auto object-contain"
+            />
+          </div>
+          <p className="text-xl text-[#7b0000] font-semibold mb-2">CPR Training Assistant</p>
+          <p className="text-sm text-[#ff524a] mt-4 font-semibold">
             Training app—call 911 in real emergencies
           </p>
         </div>
@@ -23,12 +30,12 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
           {/* Walkthrough Mode */}
           <button
             onClick={() => onSelectMode('walkthrough')}
-            className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border-2 border-white/20 hover:border-white/40 hover:bg-white/15 transition-all duration-300 transform hover:scale-105 group"
+            className="bg-white rounded-2xl p-8 border-2 border-[#ff524a] hover:border-[#7b0000] hover:bg-red-50 transition-all duration-300 transform hover:scale-105 group shadow-lg"
           >
             <div className="text-center">
-              <div className="w-20 h-20 bg-blue-500/30 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-500/50 transition-colors">
+              <div className="w-20 h-20 bg-[#ff524a]/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-[#ff524a]/30 transition-colors">
                 <svg
-                  className="w-10 h-10 text-white"
+                  className="w-10 h-10 text-[#7b0000]"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -41,8 +48,8 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">Bystander Mode</h2>
-              <p className="text-blue-200 text-sm leading-relaxed">
+              <h2 className="text-2xl font-bold text-[#7b0000] mb-3">Bystander Mode</h2>
+              <p className="text-gray-700 text-sm leading-relaxed">
                 Learn CPR basics with step-by-step guidance. Ideal for first-time responders who need
                 clear instructions during an emergency.
               </p>
@@ -52,12 +59,12 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
           {/* Feedback Mode */}
           <button
             onClick={() => onSelectMode('feedback')}
-            className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border-2 border-white/20 hover:border-white/40 hover:bg-white/15 transition-all duration-300 transform hover:scale-105 group"
+            className="bg-white rounded-2xl p-8 border-2 border-[#ff524a] hover:border-[#7b0000] hover:bg-red-50 transition-all duration-300 transform hover:scale-105 group shadow-lg"
           >
             <div className="text-center">
-              <div className="w-20 h-20 bg-purple-500/30 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-500/50 transition-colors">
+              <div className="w-20 h-20 bg-[#ff524a]/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-[#ff524a]/30 transition-colors">
                 <svg
-                  className="w-10 h-10 text-white"
+                  className="w-10 h-10 text-[#7b0000]"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -70,8 +77,8 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">EMT Mode</h2>
-              <p className="text-blue-200 text-sm leading-relaxed">
+              <h2 className="text-2xl font-bold text-[#7b0000] mb-3">EMT Mode</h2>
+              <p className="text-gray-700 text-sm leading-relaxed">
                 Advanced real-time CPR analysis with detailed metrics. Designed for trained professionals
                 to refine technique and maintain certification standards.
               </p>
@@ -79,7 +86,7 @@ export function ModeSelection({ onSelectMode }: ModeSelectionProps) {
           </button>
         </div>
 
-        <div className="mt-8 text-center text-blue-300 text-sm">
+        <div className="mt-8 text-center text-[#7b0000] text-sm">
           <p>Allow camera access when prompted to begin training</p>
         </div>
       </div>
