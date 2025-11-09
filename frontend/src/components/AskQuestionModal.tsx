@@ -4,7 +4,7 @@
  * Mutes all audio (metronome and notifications) while asking
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { audioFeedback } from '../utils/audioFeedback';
 import { audioMetronome } from '../utils/audioMetronome';
@@ -14,17 +14,43 @@ interface AskQuestionModalProps {
   onClose: () => void;
   onAskStart?: () => void; // Callback when asking starts (to mute metronome)
   onAskEnd?: () => void; // Callback when asking ends (to resume metronome)
+  initialMode?: 'typing' | 'voice'; // Initial mode when modal opens
 }
 
-export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQuestionModalProps) {
+export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd, initialMode }: AskQuestionModalProps) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
   const [service, setService] = useState<string | null>(null); // 'gemini' or 'openai'
   const [isAsking, setIsAsking] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [mode, setMode] = useState<'initial' | 'typing' | 'voice'>(initialMode || 'initial'); // Track which mode we're in
+
+  // Update mode when initialMode prop changes (when modal opens)
+  useEffect(() => {
+    if (isOpen && initialMode) {
+      setMode(initialMode);
+      // For voice mode, start recording after a brief delay to ensure modal is fully rendered
+      if (initialMode === 'voice') {
+        const timer = setTimeout(() => {
+          // startRecording is defined in the component, so it's available here
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          startRecording();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    } else if (!isOpen) {
+      // Reset to initial when modal closes
+      setMode('initial');
+      setQuestion('');
+      setAnswer(null);
+      setService(null);
+      setError(null);
+    }
+    // Note: startRecording is intentionally not in deps - it's stable and we only call it when voice mode opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialMode]);
 
   const handleAsk = async (useOpenAI = false, questionText?: string) => {
     // Use provided questionText (from transcription) or fall back to state
@@ -272,10 +298,8 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
         
         // Create audio element and play
         const audio = new Audio(audioUrl);
-        setIsPlayingAudio(true);
         
         audio.onended = () => {
-          setIsPlayingAudio(false);
           URL.revokeObjectURL(audioUrl); // Clean up
           audioFeedback.resume();
           onAskEnd?.();
@@ -283,7 +307,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
         
         audio.onerror = (err) => {
           console.error('[AskQuestionModal] Audio playback error:', err);
-          setIsPlayingAudio(false);
           URL.revokeObjectURL(audioUrl);
           setError('Failed to play audio response');
           audioFeedback.resume();
@@ -321,7 +344,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
             setService(queryData.service || null);
             setError(null);
             setIsAsking(false);
-            setIsPlayingAudio(false);
             audioFeedback.resume();
             onAskEnd?.();
           } else {
@@ -381,7 +403,6 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
       // Display the actual error message to the user
       setError(displayMessage);
       setIsAsking(false);
-      setIsPlayingAudio(false);
       audioFeedback.resume();
       onAskEnd?.();
     }
@@ -475,9 +496,21 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
       setAnswer(null);
       setService(null);
       setError(null);
+      setMode('initial');
       audioFeedback.resume();
       onClose();
     }
+  };
+
+  const handleTypeQuestion = () => {
+    setMode('typing');
+    setError(null);
+  };
+
+  const handleVoiceQuestion = () => {
+    setMode('voice');
+    setError(null);
+    startRecording();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -526,45 +559,91 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                 Ask any CPR-related question powered by Gemini / OpenAI. All audio will be muted while you receive your answer!
               </p>
 
-              <div className="mb-4 relative">
-                <textarea
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="e.g., How deep should my compressions be?"
-                  disabled={isAsking || isRecording}
-                  className="w-full px-4 py-3 pr-12 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
-                  rows={3}
-                />
-                {/* Voice recording button */}
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isAsking}
-                  className={`absolute right-2 top-2 p-2 rounded-lg transition-colors ${
-                    isRecording
-                      ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                      : 'bg-purple-600/80 hover:bg-purple-700/80'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={isRecording ? 'Stop recording' : 'Record voice question'}
-                >
-                  {isRecording ? (
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
+              {/* Initial mode: Show two buttons */}
+              {mode === 'initial' && (
+                <div className="mb-4 flex gap-3">
+                  <button
+                    onClick={handleTypeQuestion}
+                    disabled={isAsking || isRecording}
+                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    Type Question
+                  </button>
+                  <button
+                    onClick={handleVoiceQuestion}
+                    disabled={isAsking || isRecording}
+                    className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                       <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                     </svg>
+                    Voice Question
+                  </button>
+                </div>
+              )}
+
+              {/* Typing mode: Show textarea */}
+              {mode === 'typing' && (
+                <div className="mb-4">
+                  <textarea
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="e.g., How deep should my compressions be?"
+                    disabled={isAsking || isRecording}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                    rows={3}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* Voice mode: Show recording UI and transcribed text */}
+              {mode === 'voice' && (
+                <div className="mb-4">
+                  {isRecording ? (
+                    <div className="flex items-center justify-center gap-3 p-6 bg-gray-800/50 border border-gray-700 rounded-lg">
+                      <button
+                        onClick={stopRecording}
+                        className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 animate-pulse"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                        Stop Recording
+                      </button>
+                      <div className="flex items-center gap-2 text-red-400">
+                        <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                        <span className="text-sm font-medium">Recording...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Show transcribed text in textarea for reference */}
+                      {question && (
+                        <div className="mb-3">
+                          <label className="block text-sm text-gray-400 mb-1">Transcribed Question:</label>
+                          <textarea
+                            value={question}
+                            readOnly
+                            className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 resize-none text-sm"
+                            rows={3}
+                          />
+                        </div>
+                      )}
+                      {!question && !isAsking && (
+                        <div className="text-center p-6 bg-gray-800/50 border border-gray-700 rounded-lg">
+                          <p className="text-gray-400 text-sm">Recording will start automatically...</p>
+                        </div>
+                      )}
+                    </>
                   )}
-                </button>
-                {isRecording && (
-                  <div className="absolute right-2 bottom-2 flex items-center gap-1 text-red-400 text-xs">
-                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                    <span>Recording...</span>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Display answer below question */}
               {answer && (
@@ -595,15 +674,32 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                 </div>
               )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleClose}
-                  disabled={isAsking}
-                  className="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                >
-                  {answer ? 'Close' : 'Cancel'}
-                </button>
-                {!answer && (
+              {/* Action buttons - different based on mode */}
+              {mode === 'initial' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleClose}
+                    disabled={isAsking}
+                    className="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {mode === 'typing' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setMode('initial');
+                      setQuestion('');
+                      setError(null);
+                    }}
+                    disabled={isAsking}
+                    className="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    Back
+                  </button>
                   <button
                     onClick={() => handleAsk(false)}
                     disabled={isAsking || !question.trim() || isRecording}
@@ -611,8 +707,37 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                   >
                     {isAsking ? 'Asking...' : 'Ask'}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
+
+              {mode === 'voice' && !isRecording && !isAsking && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setMode('initial');
+                      setQuestion('');
+                      setError(null);
+                    }}
+                    disabled={isAsking}
+                    className="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    Back
+                  </button>
+                </div>
+              )}
+
+              {/* Show close button when answer is displayed */}
+              {answer && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleClose}
+                    disabled={isAsking}
+                    className="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         </>

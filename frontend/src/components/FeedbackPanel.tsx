@@ -19,6 +19,7 @@ export interface FeedbackPanelProps {
 export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const [askModalMode, setAskModalMode] = useState<'typing' | 'voice' | undefined>(undefined);
   const analysisStartTimeRef = useRef<number | null>(null);
   const INITIAL_DELAY_MS = 5000; // 5 seconds before first notification
 
@@ -311,16 +312,34 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                   </button>
                 </div>
                 
-                {/* Ask Question button - full width below metronome and save */}
-                <button
-                  onClick={() => setIsAskModalOpen(true)}
-                  className="w-full mt-3 px-3 py-2.5 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-xs">Ask Question</span>
-                </button>
+                {/* Ask Question buttons - two buttons side by side */}
+                <div className="w-full mt-3 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setAskModalMode('typing');
+                      setIsAskModalOpen(true);
+                    }}
+                    className="flex-1 px-2 py-2.5 bg-blue-600/80 hover:bg-blue-700/80 text-white rounded-lg transition-colors font-semibold text-xs flex items-center justify-center gap-1"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span className="text-[10px]">Type Question</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAskModalMode('voice');
+                      setIsAskModalOpen(true);
+                    }}
+                    className="flex-1 px-2 py-2.5 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-xs flex items-center justify-center gap-1"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                    </svg>
+                    <span className="text-[10px]">Voice Question</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -448,16 +467,34 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                 </button>
               </div>
               
-              {/* Second row: Ask Question button - full width */}
-              <button
-                onClick={() => setIsAskModalOpen(true)}
-                className="w-full px-2 py-1 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-[9px]">Ask Question</span>
-              </button>
+              {/* Second row: Ask Question buttons - two buttons side by side */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => {
+                    setAskModalMode('typing');
+                    setIsAskModalOpen(true);
+                  }}
+                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span className="text-[9px]">Type Question</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setAskModalMode('voice');
+                    setIsAskModalOpen(true);
+                  }}
+                  className="px-2 py-1 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                  </svg>
+                  <span className="text-[9px]">Voice Question</span>
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -466,9 +503,13 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
       {/* Ask Question Modal */}
       <AskQuestionModal
         isOpen={isAskModalOpen}
-        onClose={() => setIsAskModalOpen(false)}
+        onClose={() => {
+          setIsAskModalOpen(false);
+          setAskModalMode(undefined);
+        }}
         onAskStart={handleAskStart}
         onAskEnd={handleAskEnd}
+        initialMode={askModalMode}
       />
     </>
   );
