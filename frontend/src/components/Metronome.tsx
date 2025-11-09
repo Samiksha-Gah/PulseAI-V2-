@@ -40,12 +40,13 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
     const intervalMs = (60 / targetBPM) * 1000;
     
     // Set up visual pulse interval
+    // In browser environments, setInterval returns a number
     const visualInterval = setInterval(() => {
       setPulse(true);
       setTimeout(() => setPulse(false), 100);
     }, intervalMs);
     
-    intervalRef.current = visualInterval;
+    intervalRef.current = visualInterval as unknown as number;
 
     // Start audio metronome only if audio is enabled
     if (audioEnabled) {

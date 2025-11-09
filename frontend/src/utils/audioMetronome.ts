@@ -79,7 +79,7 @@ class AudioMetronome {
       if (this.isPlaying) {
         this.playBeep();
       }
-    }, intervalMs) as number;
+    }, intervalMs) as unknown as number;
   }
 
   /**
