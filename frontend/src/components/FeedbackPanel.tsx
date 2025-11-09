@@ -26,6 +26,24 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
   const [queryInput, setQueryInput] = useState('');
   const [audioState, setAudioState] = useState<AudioState>(audioFeedback.getState());
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  // Handle query submission
+  const handleQuerySubmit = async (question: string) => {
+    if (!question.trim()) return;
+
+    setIsQueryLoading(true);
+    try {
+      await audioFeedback.askQuestion(question, 'CPR training session');
+      setQueryInput('');
+      setIsQueryMode(false);
+    } catch (err) {
+      console.error('Query failed:', err);
+      alert('Failed to get answer. Please try again.');
+    } finally {
+      setIsQueryLoading(false);
+    }
+  };
 
   // Update prioritized message - show ONLY ONE message at a time
   useEffect(() => {
