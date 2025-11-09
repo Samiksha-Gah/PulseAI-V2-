@@ -1,6 +1,6 @@
 # PulseAI: AI-Powered CPR Training Assistant
 
-[![Build Status](https://img.shields.io/shields/build.svg)](https://pulseai-v2.onrender.com/)
+[![Build Status]](https://pulseai-v2.onrender.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-18.2.0-blue)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
@@ -64,23 +64,23 @@ This repository contains the complete monorepo for PulseAI, including the React 
 
 ## Project Structure
 
-The project is a monorepo containing the frontend and backend in separate directories.
-
+> The project is a monorepo containing the frontend and backend in separate directories.
 /
-├── backend/            # Node.js/Express server
-│   ├── server.js       # Main API server logic
-│   ├── package.json    # Backend dependencies
-│   └── .env            # (Not committed) API keys and secrets
+├── backend/           # Node.js/Express server
+│   ├── server.js      # Main API server logic
+│   ├── package.json   # Backend dependencies
+│   └── .env           # (Not committed) API keys and secrets
 │
-├── frontend/           # React/Vite client application
+├── frontend/          # React/Vite client application
 │   ├── src/
-│   │   ├── components/ # React components (CameraFeed, FeedbackPanel, etc.)
-│   │   ├── utils/      # CPR logic, audio handlers, config
-│   │   └── App.tsx     # Main application component
-│   ├── package.json    # Frontend dependencies
-│   └── vite.config.ts  # Vite configuration with backend proxy
+│   │   ├── components/  # React components (CameraFeed, FeedbackPanel, etc.)
+│   │   ├── utils/       # CPR logic, audio handlers, config
+│   │   └── App.tsx      # Main application component
+│   │
+│   ├── package.json   # Frontend dependencies
+│   └── vite.config.ts # Vite configuration with backend proxy
 │
-└── README.md           # This file
+└── README.md          # This file
 ---
 
 ## Local Development
