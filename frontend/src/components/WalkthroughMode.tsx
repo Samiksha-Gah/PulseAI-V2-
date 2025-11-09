@@ -8,6 +8,7 @@ import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
 import { UploadMock } from './UploadMock';
+import { AppVersion } from '../App';
 
 type WalkthroughStep =
   | 'welcome'
@@ -21,6 +22,7 @@ type WalkthroughStep =
 interface WalkthroughModeProps {
   onSkipToCompressions: () => void;
   onBack: () => void;
+  appVersion: AppVersion;
 }
 
 export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughModeProps) {

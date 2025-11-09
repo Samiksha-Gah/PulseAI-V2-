@@ -19,9 +19,10 @@ export type { CPRMetrics };
 
 interface CameraFeedProps {
   onMetricsUpdate: (metrics: CPRMetrics) => void;
+  facingMode?: 'user' | 'environment'; // 'user' = front camera, 'environment' = back camera
 }
 
-export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
+export function CameraFeed({ onMetricsUpdate, facingMode = 'user' }: CameraFeedProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const blurCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -450,10 +451,15 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
   /**
    * Initialize webcam stream
    */
-  const initializeCamera = async () => {
+  const initializeCamera = async (facing: 'user' | 'environment' = facingMode) => {
     try {
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: 'user' },
+        video: { width: 1280, height: 720, facingMode: facing },
       });
 
       const video = videoRef.current;
@@ -537,6 +543,27 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
     };
   }, []);
 
+  // Handle camera flip when facingMode changes (skip on initial mount)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    if (isInitialized) {
+      setIsInitialized(false);
+      initializeCamera(facingMode)
+        .then(() => {
+          setError(null);
+        })
+        .catch((err) => {
+          console.error('Error flipping camera:', err);
+          setError('Failed to flip camera');
+        });
+    }
+  }, [facingMode]);
+
   // Watchdog: if not initialized within 4 seconds and no error, show retry button
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -583,7 +610,7 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
             <p className="text-sm opacity-75">Please allow camera permissions</p>
             {needsInteraction && (
               <button
-                onClick={initializeCamera}
+                onClick={() => initializeCamera(facingMode)}
                 className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold"
               >
                 Enable Camera
