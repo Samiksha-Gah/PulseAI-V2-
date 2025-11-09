@@ -213,3 +213,6 @@ For detailed instructions on deploying to Render, see `RENDER_DEPLOYMENT.md`.
 ## License
 
 This project is licensed under the **MIT License**.
+
+## Contact
+Hriday Unadkat (@shark66124 on Discord, hu0294@princeton.edu, 703-991-3088), Lynn Morris III (@lynyrd925, 434-409-3218), Eshaan Govil (@EshGov16, 609-436-8199), Samiksha Gaherwar (404-980-3645)
