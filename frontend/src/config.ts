@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * Application Configuration
  * Update BACKEND_URL when deploying to production

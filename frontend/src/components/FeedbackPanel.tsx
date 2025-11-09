@@ -3,7 +3,7 @@
  * Displays comprehensive CPR feedback with modern UI and color-coded auras
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { motion } from 'framer-motion';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -16,30 +16,8 @@ export interface FeedbackPanelProps {
 
 export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
-  // Audio state
-  const [isListening, setIsListening] = useState(false);
-  const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const audioState = useRef(audioFeedback.getState());
-
-  // Handle query submission
-  const handleQuerySubmit = async (question: string) => {
-    if (!question.trim()) return;
-
-    setIsQueryLoading(true);
-    try {
-      await audioFeedback.askQuestion(question, 'CPR training session');
-    } catch (err) {
-      console.error('Error asking question:', err);
-      console.error('Query failed:', err);
-      alert('Failed to get answer. Please try again.');
-    } finally {
-      setIsQueryLoading(false);
-    }
-  };
-
   // Show the highest priority message
   useEffect(() => {
-    // Determine overall priority from individual feedbacks
     const priorities = [
       { feedback: rateFeedback, name: 'rate' },
       { feedback: depthFeedback, name: 'depth' },
@@ -55,12 +33,17 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
     // Only show positive message if ALL are good (priority <= 1)
     if (priorities.every(p => p.feedback.priority <= 1)) {
       // Audio feedback for good technique
-      audioFeedback.playNotification('Excellent CPR technique! Keep it up!');
+      audioFeedback.queueNotification('Excellent CPR technique! Keep it up!', 'encouragement', 3);
     } else {
       // Audio feedback for the highest priority issue
-      audioFeedback.playNotification(topPriority.feedback.message);
+      audioFeedback.queueNotification(
+        topPriority.feedback.message,
+        topPriority.name as 'depth' | 'rate' | 'position',
+        topPriority.feedback.priority
+      );
     }
-  }, []);
+  }, [rateFeedback, depthFeedback, placementFeedback]);
+
 
   // Color mapping for status with auras
   const colorClasses = {
