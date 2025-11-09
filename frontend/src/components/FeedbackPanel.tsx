@@ -21,7 +21,11 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
   const [askModalMode, setAskModalMode] = useState<'typing' | 'voice' | undefined>(undefined);
   const analysisStartTimeRef = useRef<number | null>(null);
-  const INITIAL_DELAY_MS = 5000; // 5 seconds before first notification
+  const errorStartTimeRef = useRef<number | null>(null); // Track when errors started
+  const hasShownStartMessageRef = useRef<boolean>(false); // Track if we've shown "start compressions"
+  const lastNotificationTimeRef = useRef<number>(0); // Track last notification time
+  const ERROR_DURATION_MS = 5000; // 5 seconds of continuous errors before notification
+  const NOTIFICATION_COOLDOWN_MS = 5000; // 5 seconds between notifications
 
   // Handle muting metronome when asking a question
   const handleAskStart = () => {
@@ -39,23 +43,23 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
   useEffect(() => {
     if (analysisStartTimeRef.current === null && (bpm > 0 || compressionCount > 0)) {
       analysisStartTimeRef.current = Date.now();
-      console.log('[FeedbackPanel] CPR analysis started, audio feedback will begin in 5 seconds');
+      console.log('[FeedbackPanel] CPR analysis started');
+      // Show "start compressions" as first message
+      if (!hasShownStartMessageRef.current) {
+        audioFeedback.queueNotification('Start compressions', 'encouragement', 3);
+        hasShownStartMessageRef.current = true;
+        lastNotificationTimeRef.current = Date.now();
+      }
     }
   }, [bpm, compressionCount]);
 
-  // Show the highest priority message
+  // Show feedback only if errors persist for 5 seconds
   useEffect(() => {
-    // Don't queue notifications until 5 seconds have passed since analysis started
     if (analysisStartTimeRef.current === null) {
       return; // Analysis hasn't started yet
     }
 
-    const timeSinceStart = Date.now() - analysisStartTimeRef.current;
-    if (timeSinceStart < INITIAL_DELAY_MS) {
-      // Still in initial 5-second delay period
-      return;
-    }
-
+    const now = Date.now();
     const priorities = [
       { feedback: rateFeedback, name: 'rate' },
       { feedback: depthFeedback, name: 'depth' },
@@ -64,21 +68,44 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
 
     // Sort by priority (highest first)
     priorities.sort((a, b) => b.feedback.priority - a.feedback.priority);
-
-    // Show ONLY the highest priority message (one at a time)
     const topPriority = priorities[0];
-    
-    // Only show positive message if ALL are good (priority <= 1)
-    if (priorities.every(p => p.feedback.priority <= 1)) {
-      // Audio feedback for good technique
-      audioFeedback.queueNotification('Excellent CPR technique! Keep it up!', 'encouragement', 3);
-    } else {
-      // Audio feedback for the highest priority issue
-      audioFeedback.queueNotification(
-        topPriority.feedback.message,
-        topPriority.name as 'depth' | 'rate' | 'position',
-        topPriority.feedback.priority
-      );
+
+    // Check if there are any errors (priority > 1 means there's an issue)
+    const hasErrors = priorities.some(p => p.feedback.priority > 1);
+    const allGood = priorities.every(p => p.feedback.priority <= 1);
+
+    if (allGood) {
+      // Reset error timer if doing correctly
+      errorStartTimeRef.current = null;
+      // Don't give constant reminders that CPR is being done well
+      return;
+    }
+
+    // If there are errors, track when they started
+    if (hasErrors && errorStartTimeRef.current === null) {
+      errorStartTimeRef.current = now;
+      return; // Wait for 5 seconds before notifying
+    }
+
+    // If errors have been ongoing for 5+ seconds, and enough time has passed since last notification
+    if (errorStartTimeRef.current !== null && hasErrors) {
+      const errorDuration = now - errorStartTimeRef.current;
+      const timeSinceLastNotification = now - lastNotificationTimeRef.current;
+
+      if (errorDuration >= ERROR_DURATION_MS && timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS) {
+        // Show notification for the highest priority issue
+        audioFeedback.queueNotification(
+          topPriority.feedback.message,
+          topPriority.name as 'depth' | 'rate' | 'position',
+          topPriority.feedback.priority
+        );
+        lastNotificationTimeRef.current = now;
+        // Reset error timer after notification (will restart if errors continue)
+        errorStartTimeRef.current = now;
+      }
+    } else if (!hasErrors) {
+      // Reset error timer if errors are fixed
+      errorStartTimeRef.current = null;
     }
   }, [rateFeedback, depthFeedback, placementFeedback]);
 
@@ -319,7 +346,7 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                       setAskModalMode('typing');
                       setIsAskModalOpen(true);
                     }}
-                    className="flex-1 px-2 py-2.5 bg-blue-600/80 hover:bg-blue-700/80 text-white rounded-lg transition-colors font-semibold text-xs flex items-center justify-center gap-1"
+                    className="flex-1 px-2 py-2.5 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-xs flex items-center justify-center gap-1"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -474,7 +501,7 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                     setAskModalMode('typing');
                     setIsAskModalOpen(true);
                   }}
-                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                  className="px-2 py-1 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
