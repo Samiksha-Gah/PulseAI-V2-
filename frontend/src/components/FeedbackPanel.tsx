@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { messagePrioritizer } from '../utils/messagePrioritizer';
 import { motion } from 'framer-motion';
+import { audioFeedback, AudioState } from '../utils/audioFeedback';
 export interface FeedbackPanelProps {
   metrics: CPRMetrics;
   metronomeEnabled?: boolean;
@@ -19,6 +20,12 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
   const [prioritizedMessage, setPrioritizedMessage] = useState(
     messagePrioritizer.getCurrentMessage()
   );
+  
+  // Audio query state
+  const [isQueryMode, setIsQueryMode] = useState(false);
+  const [queryInput, setQueryInput] = useState('');
+  const [audioState, setAudioState] = useState<AudioState>(audioFeedback.getState());
+  const [isQueryLoading, setIsQueryLoading] = useState(false);
 
   // Update prioritized message - show ONLY ONE message at a time
   useEffect(() => {
