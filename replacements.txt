@@ -1,0 +1,5 @@
+# replacements for git-filter-repo replace-text
+# Replace any assignments of these env vars with a redacted placeholder
+regex:ELEVENLABS_API_KEY=.*==>ELEVENLABS_API_KEY=REDACTED
+regex:GEMINI_API_KEY=.*==>GEMINI_API_KEY=REDACTED
+regex:OPENAI_API_KEY=.*==>OPENAI_API_KEY=REDACTED
