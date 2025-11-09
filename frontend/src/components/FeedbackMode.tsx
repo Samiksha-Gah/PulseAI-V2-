@@ -36,6 +36,19 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
     }
   };
 
+  const handleSaveVideo = async () => {
+    try {
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `cpr-recording-${timestamp}.webm`;
+      
+      await screenRecorder.downloadVideo(filename);
+    } catch (error) {
+      console.error('Failed to save video:', error);
+      alert('Failed to save video. Please try again.');
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -65,6 +78,7 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
           metrics={metrics}
           metronomeEnabled={metronomeEnabled}
           onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
+          onSaveVideo={handleSaveVideo}
         />
       )}
 

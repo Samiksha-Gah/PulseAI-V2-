@@ -7,15 +7,14 @@ import { useEffect, useState } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { messagePrioritizer } from '../utils/messagePrioritizer';
 import { motion } from 'framer-motion';
-import { UploadMock } from './UploadMock';
-
 export interface FeedbackPanelProps {
   metrics: CPRMetrics;
   metronomeEnabled?: boolean;
   onMetronomeToggle?: () => void;
+  onSaveVideo?: () => void;
 }
 
-export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: FeedbackPanelProps) {
+export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
   const [prioritizedMessage, setPrioritizedMessage] = useState(
     messagePrioritizer.getCurrentMessage()
@@ -239,11 +238,11 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
                 <div className="text-xs text-gray-400">{placementFeedback.message}</div>
               </div>
 
-              {/* Metronome and Upload buttons */}
-              {onMetronomeToggle && (
-                <div className="pt-4 mt-4 border-t border-white/20">
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Metronome toggle button */}
+              {/* Metronome and Save buttons */}
+              <div className="pt-4 mt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Metronome toggle button */}
+                  {onMetronomeToggle ? (
                     <button
                       onClick={onMetronomeToggle}
                       className="px-3 py-2.5 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
@@ -251,14 +250,23 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
                       <span className="text-lg">{metronomeEnabled ? '🔊' : '🔇'}</span>
                       <span className="text-xs">{metronomeEnabled ? 'ON' : 'OFF'}</span>
                     </button>
-                    
-                    {/* Upload button */}
-                    <div className="w-full">
-                      <UploadMock />
-                    </div>
-                  </div>
+                  ) : (
+                    <div></div>
+                  )}
+                  
+                  {/* Save Video button - always visible */}
+                  <button
+                    onClick={onSaveVideo || (() => {})}
+                    disabled={!onSaveVideo}
+                    className="px-3 py-2.5 bg-blue-600/80 hover:bg-blue-700/80 disabled:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span className="text-xs">Save</span>
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -356,9 +364,9 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
             </div>
 
             {/* Buttons: Separate columns */}
-            {onMetronomeToggle && (
-              <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-white/20">
-                {/* Metronome toggle button */}
+            <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-white/20">
+              {/* Metronome toggle button */}
+              {onMetronomeToggle ? (
                 <button
                   onClick={onMetronomeToggle}
                   className="px-2 py-1 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
@@ -366,13 +374,22 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle }: 
                   <span className="text-sm">{metronomeEnabled ? '🔊' : '🔇'}</span>
                   <span className="text-[9px]">{metronomeEnabled ? 'ON' : 'OFF'}</span>
                 </button>
-                
-                {/* Upload button */}
-                <div className="w-full">
-                  <UploadMock />
-                </div>
-              </div>
-            )}
+              ) : (
+                <div></div>
+              )}
+              
+              {/* Save Video button - always visible */}
+              <button
+                onClick={onSaveVideo || (() => {})}
+                disabled={!onSaveVideo}
+                className="px-2 py-1 bg-blue-600/80 hover:bg-blue-700/80 disabled:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span className="text-[9px]">Save</span>
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

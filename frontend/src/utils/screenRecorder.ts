@@ -7,10 +7,11 @@ export class ScreenRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private recordedChunks: Blob[] = [];
   private stream: MediaStream | null = null;
-  private recordingDuration: number = 15000; // 15 seconds buffer
+  private recordingDuration: number = 20000; // 20 seconds buffer
   private chunkTimestamps: number[] = [];
   private isRecording: boolean = false;
   private cleanupInterval: number | null = null;
+  private recordingStartTime: number | null = null; // Track when recording started
 
   /**
    * Start recording from a canvas stream
@@ -63,6 +64,7 @@ export class ScreenRecorder {
       // Start recording with timeslice to get regular chunks
       this.mediaRecorder.start(500); // Get chunks every 500ms for better performance
       this.isRecording = true;
+      this.recordingStartTime = Date.now(); // Record start time
 
       // Set up periodic cleanup
       this.cleanupInterval = window.setInterval(() => {
@@ -76,8 +78,21 @@ export class ScreenRecorder {
 
   /**
    * Remove chunks older than the recording duration
+   * For the first 20 seconds, keep all chunks. After 20 seconds, use rolling buffer.
    */
   private cleanOldChunks(currentTime: number): void {
+    if (!this.recordingStartTime) {
+      return; // No recording started yet
+    }
+
+    const elapsedTime = currentTime - this.recordingStartTime;
+
+    // If less than 20 seconds have passed, keep all chunks
+    if (elapsedTime < this.recordingDuration) {
+      return;
+    }
+
+    // After 20 seconds, switch to rolling buffer - only keep last 20 seconds
     const cutoffTime = currentTime - this.recordingDuration;
 
     // Remove chunks that are too old
@@ -114,10 +129,14 @@ export class ScreenRecorder {
       this.stream.getTracks().forEach((track) => track.stop());
       this.stream = null;
     }
+
+    // Reset start time
+    this.recordingStartTime = null;
   }
 
   /**
    * Get the recorded video as a Blob
+   * Returns all chunks from the start (if < 20 seconds) or last 20 seconds
    */
   async getRecordedVideo(): Promise<Blob | null> {
     return new Promise((resolve) => {
@@ -133,8 +152,17 @@ export class ScreenRecorder {
 
       // Wait a bit for any pending chunks to be processed
       setTimeout(() => {
-        // Final cleanup before creating blob
-        this.cleanOldChunks(Date.now());
+        const currentTime = Date.now();
+        
+        // Only clean if we're past 20 seconds
+        if (this.recordingStartTime) {
+          const elapsedTime = currentTime - this.recordingStartTime;
+          if (elapsedTime >= this.recordingDuration) {
+            // Clean old chunks (rolling buffer mode)
+            this.cleanOldChunks(currentTime);
+          }
+          // If < 20 seconds, keep all chunks (no cleanup)
+        }
 
         if (this.recordedChunks.length === 0) {
           resolve(null);
@@ -184,6 +212,7 @@ export class ScreenRecorder {
   clearRecording(): void {
     this.recordedChunks = [];
     this.chunkTimestamps = [];
+    this.recordingStartTime = null;
   }
 }
 
