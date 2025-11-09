@@ -1,13 +1,7 @@
 /**
  * Screen Recorder Utility
  * Records canvas/video stream with a rolling buffer for the last few seconds
- * Includes face blurring and MP4 conversion
  */
-
-// Lazy load FFmpeg to avoid blocking app initialization
-let FFmpegClass: any = null;
-let fetchFileFunc: any = null;
-let toBlobURLFunc: any = null;
 
 export class ScreenRecorder {
   private mediaRecorder: MediaRecorder | null = null;
@@ -18,46 +12,6 @@ export class ScreenRecorder {
   private isRecording: boolean = false;
   private cleanupInterval: number | null = null;
   private recordingStartTime: number | null = null; // Track when recording started
-  private ffmpeg: any = null;
-  private ffmpegLoaded: boolean = false;
-
-  /**
-   * Initialize FFmpeg for video conversion (lazy load)
-   */
-  private async loadFFmpeg(): Promise<void> {
-    if (this.ffmpegLoaded && this.ffmpeg) {
-      return;
-    }
-
-    try {
-      // Lazy load FFmpeg modules only when needed
-      if (!FFmpegClass) {
-        const ffmpegModule = await import('@ffmpeg/ffmpeg');
-        const utilModule = await import('@ffmpeg/util');
-        FFmpegClass = ffmpegModule.FFmpeg;
-        fetchFileFunc = utilModule.fetchFile;
-        toBlobURLFunc = utilModule.toBlobURL;
-      }
-
-      this.ffmpeg = new FFmpegClass();
-      
-      // Load FFmpeg from CDN
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      await this.ffmpeg.load({
-        coreURL: await toBlobURLFunc(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURLFunc(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      });
-
-      this.ffmpegLoaded = true;
-      console.log('FFmpeg loaded successfully');
-    } catch (error) {
-      console.error('Failed to load FFmpeg:', error);
-      // Don't throw - allow app to continue without MP4 conversion
-      this.ffmpegLoaded = false;
-      this.ffmpeg = null;
-    }
-  }
-
 
   /**
    * Start recording from a canvas stream
@@ -108,8 +62,7 @@ export class ScreenRecorder {
       };
 
       // Start recording with timeslice to get regular chunks
-      // Use smaller timeslice for better reliability
-      this.mediaRecorder.start(100); // Get chunks every 100ms for better reliability
+      this.mediaRecorder.start(500); // Get chunks every 500ms for better performance
       this.isRecording = true;
       this.recordingStartTime = Date.now(); // Record start time
 
@@ -197,8 +150,8 @@ export class ScreenRecorder {
         this.mediaRecorder.requestData();
       }
 
-      // Wait for MediaRecorder to finish if it's stopping
-      const waitForChunks = () => {
+      // Wait a bit for any pending chunks to be processed
+      setTimeout(() => {
         const currentTime = Date.now();
         
         // Only clean if we're past 20 seconds
@@ -216,127 +169,34 @@ export class ScreenRecorder {
           return;
         }
 
-        // Check if MediaRecorder is still active
-        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-          // Request data and wait a bit more
-          this.mediaRecorder.requestData();
-          setTimeout(waitForChunks, 500);
-        } else {
-          // MediaRecorder is stopped or inactive, create blob
-          // Create blob with all chunks - ensure proper order
-          const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-          resolve(blob);
-        }
-      };
-
-      // Start waiting for chunks
-      setTimeout(waitForChunks, 500);
+        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+        resolve(blob);
+      }, 800);
     });
   }
 
   /**
-   * Convert WebM to MP4 using ffmpeg
+   * Download the recorded video
    */
-  private async convertToMP4(webmBlob: Blob): Promise<Blob> {
-    try {
-      // Load FFmpeg if not already loaded
-      await this.loadFFmpeg();
+  async downloadVideo(filename: string = 'cpr-recording.webm'): Promise<void> {
+    const blob = await this.getRecordedVideo();
 
-      if (!this.ffmpeg) {
-        throw new Error('FFmpeg not loaded');
-      }
-
-      // Write input file
-      await this.ffmpeg.writeFile('input.webm', await fetchFileFunc(webmBlob));
-
-      // Convert WebM to MP4 (no blur)
-      await this.ffmpeg.exec([
-        '-i', 'input.webm',
-        '-c:v', 'libx264',
-        '-c:a', 'aac',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-movflags', '+faststart',
-        '-pix_fmt', 'yuv420p', // Ensure compatibility
-        'output.mp4'
-      ]);
-
-      // Read output file
-      const data = await this.ffmpeg.readFile('output.mp4');
-      const mp4Blob = data instanceof Uint8Array 
-        ? new Blob([new Uint8Array(data)], { type: 'video/mp4' })
-        : new Blob([data], { type: 'video/mp4' });
-
-      // Cleanup
-      await this.ffmpeg.deleteFile('input.webm');
-      await this.ffmpeg.deleteFile('output.mp4');
-
-      return mp4Blob;
-    } catch (error) {
-      console.error('MP4 conversion failed:', error);
-      // Return original WebM if conversion fails
-      return webmBlob;
-    }
-  }
-
-  /**
-   * Download the recorded video as MP4 (non-blocking)
-   */
-  async downloadVideo(filename: string = 'cpr-recording.mp4'): Promise<void> {
-    // Don't block - process in background
-    this.processAndDownloadVideo(filename).catch((error) => {
-      console.error('Failed to save video:', error);
-      alert('Failed to save video. Please try again.');
-    });
-  }
-
-  /**
-   * Process and download video (runs in background)
-   */
-  private async processAndDownloadVideo(filename: string): Promise<void> {
-    const webmBlob = await this.getRecordedVideo();
-
-    if (!webmBlob) {
+    if (!blob) {
       console.warn('No video data to download');
-      alert('No video recorded yet. Please wait a moment and try again.');
       return;
     }
 
-    // Show processing message (non-blocking)
-    console.log('Converting to MP4...');
-    
-    // Try to convert to MP4, fallback to WebM if conversion fails
-    let finalBlob = webmBlob;
-    let finalFilename = filename;
-    
-    try {
-      const mp4Blob = await this.convertToMP4(webmBlob);
-      // Check if conversion actually worked (not the original WebM)
-      if (mp4Blob.type === 'video/mp4') {
-        finalBlob = mp4Blob;
-        finalFilename = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
-      } else {
-        // Conversion failed, use WebM
-        finalFilename = filename.replace(/\.mp4$/, '.webm');
-        console.warn('MP4 conversion failed, saving as WebM');
-      }
-    } catch (conversionError) {
-      console.warn('MP4 conversion failed, saving as WebM:', conversionError);
-      finalFilename = filename.replace(/\.mp4$/, '.webm');
-    }
-
     // Create download link
-    const url = URL.createObjectURL(finalBlob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = finalFilename;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
 
     // Clean up
     URL.revokeObjectURL(url);
-    console.log('Video saved successfully');
   }
 
   /**
@@ -358,3 +218,4 @@ export class ScreenRecorder {
 
 // Export singleton instance
 export const screenRecorder = new ScreenRecorder();
+
