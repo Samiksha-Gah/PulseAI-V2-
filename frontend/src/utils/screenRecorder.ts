@@ -4,8 +4,10 @@
  * Includes face blurring and MP4 conversion
  */
 
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+// Lazy load FFmpeg to avoid blocking app initialization
+let FFmpegClass: any = null;
+let fetchFileFunc: any = null;
+let toBlobURLFunc: any = null;
 
 export class ScreenRecorder {
   private mediaRecorder: MediaRecorder | null = null;
@@ -16,11 +18,11 @@ export class ScreenRecorder {
   private isRecording: boolean = false;
   private cleanupInterval: number | null = null;
   private recordingStartTime: number | null = null; // Track when recording started
-  private ffmpeg: FFmpeg | null = null;
+  private ffmpeg: any = null;
   private ffmpegLoaded: boolean = false;
 
   /**
-   * Initialize FFmpeg for video conversion
+   * Initialize FFmpeg for video conversion (lazy load)
    */
   private async loadFFmpeg(): Promise<void> {
     if (this.ffmpegLoaded && this.ffmpeg) {
@@ -28,20 +30,31 @@ export class ScreenRecorder {
     }
 
     try {
-      this.ffmpeg = new FFmpeg();
+      // Lazy load FFmpeg modules only when needed
+      if (!FFmpegClass) {
+        const ffmpegModule = await import('@ffmpeg/ffmpeg');
+        const utilModule = await import('@ffmpeg/util');
+        FFmpegClass = ffmpegModule.FFmpeg;
+        fetchFileFunc = utilModule.fetchFile;
+        toBlobURLFunc = utilModule.toBlobURL;
+      }
+
+      this.ffmpeg = new FFmpegClass();
       
       // Load FFmpeg from CDN
       const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
       await this.ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: await toBlobURLFunc(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURLFunc(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
       this.ffmpegLoaded = true;
       console.log('FFmpeg loaded successfully');
     } catch (error) {
       console.error('Failed to load FFmpeg:', error);
-      throw error;
+      // Don't throw - allow app to continue without MP4 conversion
+      this.ffmpegLoaded = false;
+      this.ffmpeg = null;
     }
   }
 
@@ -234,7 +247,7 @@ export class ScreenRecorder {
       }
 
       // Write input file
-      await this.ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+      await this.ffmpeg.writeFile('input.webm', await fetchFileFunc(webmBlob));
 
       // Convert WebM to MP4 with face blurring
       // Using ffmpeg's boxblur filter as a simple blur approach
@@ -267,7 +280,7 @@ export class ScreenRecorder {
       // Try simple conversion without blur as fallback
       try {
         if (this.ffmpeg) {
-          await this.ffmpeg.writeFile('input.webm', await fetchFile(webmBlob));
+          await this.ffmpeg.writeFile('input.webm', await fetchFileFunc(webmBlob));
           await this.ffmpeg.exec([
             '-i', 'input.webm',
             '-c:v', 'libx264',
@@ -310,14 +323,31 @@ export class ScreenRecorder {
       // Show processing message
       console.log('Converting to MP4...');
       
-      // Convert to MP4
-      const mp4Blob = await this.convertToMP4WithFaceBlur(webmBlob);
+      // Try to convert to MP4, fallback to WebM if conversion fails
+      let finalBlob = webmBlob;
+      let finalFilename = filename;
+      
+      try {
+        const mp4Blob = await this.convertToMP4WithFaceBlur(webmBlob);
+        // Check if conversion actually worked (not the original WebM)
+        if (mp4Blob.type === 'video/mp4') {
+          finalBlob = mp4Blob;
+          finalFilename = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
+        } else {
+          // Conversion failed, use WebM
+          finalFilename = filename.replace(/\.mp4$/, '.webm');
+          console.warn('MP4 conversion failed, saving as WebM');
+        }
+      } catch (conversionError) {
+        console.warn('MP4 conversion failed, saving as WebM:', conversionError);
+        finalFilename = filename.replace(/\.mp4$/, '.webm');
+      }
 
       // Create download link
-      const url = URL.createObjectURL(mp4Blob);
+      const url = URL.createObjectURL(finalBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename.endsWith('.mp4') ? filename : filename.replace(/\.webm$/, '.mp4');
+      a.download = finalFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
