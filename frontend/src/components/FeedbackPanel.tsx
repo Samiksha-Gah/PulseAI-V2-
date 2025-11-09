@@ -119,8 +119,8 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
         </div>
       </motion.div>
 
-      {/* Data Panel - Bottom bar on mobile, middle right on desktop */}
-      <div className="fixed bottom-0 left-0 right-0 md:bottom-auto md:right-4 md:top-1/2 md:left-auto md:-translate-y-1/2 z-40 md:w-[280px]">
+      {/* Unified Metrics Panel - Right side on desktop, bottom on mobile */}
+      <div className="fixed bottom-4 right-4 md:right-4 md:top-1/2 md:bottom-auto md:-translate-y-1/2 z-40 w-[calc(100%-2rem)] max-w-[280px] md:w-[280px]">
         <motion.div
           animate={{
             boxShadow: [
@@ -134,85 +134,75 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-          className="bg-black/70 backdrop-blur-lg rounded-t-2xl md:rounded-2xl p-3 md:p-5 border-t-2 md:border-2 border-white/20 shadow-2xl"
+          className="bg-black/70 backdrop-blur-lg rounded-2xl p-5 border-2 border-white/20 shadow-2xl"
         >
-          {/* Warning notification - only show on desktop */}
-          <div className="hidden md:block mb-4 pb-3 bg-red-500/30 rounded-lg px-3 py-2 border border-red-500/50">
-            <p className="text-xs font-bold text-white">Training app—call 911 in real emergencies</p>
-          </div>
-          
-          {/* Desktop: Keep original layout */}
-          <div className="hidden md:block">
-            <div className="mb-4 pb-3 border-b border-white/20">
-              <h3 className="text-lg font-bold text-white uppercase tracking-wide">Data</h3>
+          <div className="space-y-4">
+            {/* Rate */}
+            <div className="border-b border-white/10 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Rate</span>
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    rateFeedback.color === 'green'
+                      ? 'bg-green-500/30 text-green-300'
+                      : rateFeedback.color === 'orange'
+                      ? 'bg-orange-500/30 text-orange-300'
+                      : 'bg-red-500/30 text-red-300'
+                  }`}
+                >
+                  {rateFeedback.color === 'green' ? 'Good' : rateFeedback.color === 'orange' ? 'Warning' : 'Critical'}
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">{bpm || '--'} BPM</div>
+              <div className="text-xs text-gray-400">Target: 100-120 BPM</div>
             </div>
-            <div className="space-y-4">
-              {/* Rate */}
-              <div className="border-b border-white/10 pb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Rate</span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      rateFeedback.color === 'green'
-                        ? 'bg-green-500/30 text-green-300'
-                        : rateFeedback.color === 'orange'
-                        ? 'bg-orange-500/30 text-orange-300'
-                        : 'bg-red-500/30 text-red-300'
-                    }`}
-                  >
-                    {rateFeedback.color === 'green' ? 'Good' : rateFeedback.color === 'orange' ? 'Warning' : 'Critical'}
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-white mb-1">{bpm || '--'} BPM</div>
-                <div className="text-xs text-gray-400">Target: 100-120 BPM</div>
-              </div>
 
-              {/* Depth */}
-              <div className="border-b border-white/10 pb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Depth</span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      depthFeedback.color === 'green'
-                        ? 'bg-green-500/30 text-green-300'
-                        : depthFeedback.color === 'orange'
-                        ? 'bg-orange-500/30 text-orange-300'
-                        : 'bg-red-500/30 text-red-300'
-                    }`}
-                  >
-                    {depthFeedback.color === 'green' ? 'Good' : depthFeedback.color === 'orange' ? 'Warning' : 'Critical'}
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-white mb-1">{depthMm || '--'}mm</div>
-                <div className="text-xs text-gray-400">Target: 50-60mm</div>
+            {/* Depth */}
+            <div className="border-b border-white/10 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Depth</span>
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    depthFeedback.color === 'green'
+                      ? 'bg-green-500/30 text-green-300'
+                      : depthFeedback.color === 'orange'
+                      ? 'bg-orange-500/30 text-orange-300'
+                      : 'bg-red-500/30 text-red-300'
+                  }`}
+                >
+                  {depthFeedback.color === 'green' ? 'Good' : depthFeedback.color === 'orange' ? 'Warning' : 'Critical'}
+                </span>
               </div>
+              <div className="text-2xl font-bold text-white mb-1">{depthMm || '--'}mm</div>
+              <div className="text-xs text-gray-400">Target: 50-60mm</div>
+            </div>
 
-              {/* Compressions */}
-              <div className="border-b border-white/10 pb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Compressions</span>
-                  {isComplete && (
-                    <span className="text-xs px-2 py-1 rounded bg-green-500/30 text-green-300">
-                      Complete
-                    </span>
-                  )}
-                </div>
-                <div className="text-2xl font-bold text-white mb-2">
-                  <span className={isComplete ? 'text-green-400' : 'text-blue-400'}>
-                    {compressionCount}
+            {/* Compressions */}
+            <div className="border-b border-white/10 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Compressions</span>
+                {isComplete && (
+                  <span className="text-xs px-2 py-1 rounded bg-green-500/30 text-green-300">
+                    Complete
                   </span>
-                  <span className="text-gray-500">/30</span>
-                </div>
-                {/* Progress bar */}
-                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      isComplete ? 'bg-green-500' : 'bg-blue-500'
-                    }`}
-                    style={{ width: `${compressionProgress}%` }}
-                  />
-                </div>
+                )}
               </div>
+              <div className="text-2xl font-bold text-white mb-2">
+                <span className={isComplete ? 'text-green-400' : 'text-blue-400'}>
+                  {compressionCount}
+                </span>
+                <span className="text-gray-500">/30</span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    isComplete ? 'bg-green-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${compressionProgress}%` }}
+                />
+              </div>
+            </div>
 
               {/* Placement */}
               <div>
