@@ -11,6 +11,7 @@ import { API_ENDPOINTS } from '../config';
 import { SummaryModal } from './SummaryModal';
 // Recording of video removed. We now sample metrics per-second and export JSON.
 import { audioFeedback } from '../utils/audioFeedback';
+import { audioMetronome } from '../utils/audioMetronome';
 
 interface FeedbackModeProps {
   onBack: () => void;
