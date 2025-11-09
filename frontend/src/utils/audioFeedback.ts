@@ -144,13 +144,73 @@ class AudioFeedbackManager {
         body: JSON.stringify({ question, context }),
       });
 
+      // Check content type first
+      const contentType = response.headers.get('content-type') || '';
+      
       if (!response.ok) {
-        throw new Error(`Query failed: ${response.statusText}`);
+        let errorMessage = `Query failed: ${response.statusText}`;
+        
+        // Try to parse JSON error response
+        if (contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+            if (errorData.details) {
+              // Try to extract more details from nested error
+              try {
+                const details = typeof errorData.details === 'string' ? JSON.parse(errorData.details) : errorData.details;
+                if (details.detail?.message) {
+                  errorMessage = details.detail.message;
+                }
+              } catch (e) {
+                // If details can't be parsed, use the main error message
+              }
+            }
+          } catch (parseError) {
+            console.warn('[Audio] Could not parse error response:', parseError);
+            // Try reading as text as fallback
+            try {
+              const errorText = await response.text();
+              errorMessage = errorText || errorMessage;
+            } catch (e) {
+              // Use default error message
+            }
+          }
+        } else {
+          // Try to read as text if not JSON
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (e) {
+            // Use default error message
+          }
+        }
+        throw new Error(errorMessage);
       }
 
+      // Response is OK, check if it's actually audio
       const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
       
+      // Check if blob is actually audio (not an error JSON that was converted to blob)
+      if (audioBlob.size === 0) {
+        throw new Error('Received empty audio response');
+      }
+      
+      // If content-type suggests JSON (shouldn't happen if response.ok, but check anyway)
+      if (contentType.includes('application/json')) {
+        const text = await audioBlob.text();
+        try {
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.error || errorData.message || 'TTS generation failed');
+        } catch (e) {
+          if (e instanceof Error && !e.message.includes('Unexpected token')) {
+            throw e;
+          }
+          // If it's not JSON, continue with audio playback
+        }
+      }
+      
+      const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       
       await new Promise<void>((resolve, reject) => {
@@ -159,12 +219,16 @@ class AudioFeedbackManager {
           this.resume();
           resolve();
         };
-        audio.onerror = () => {
+        audio.onerror = (e) => {
           URL.revokeObjectURL(audioUrl);
           this.resume();
           reject(new Error('Audio playback failed'));
         };
-        audio.play().catch(reject);
+        audio.play().catch((playError) => {
+          URL.revokeObjectURL(audioUrl);
+          this.resume();
+          reject(new Error(`Audio playback failed: ${playError.message}`));
+        });
       });
     } catch (err) {
       console.error('[Audio] Query error:', err);

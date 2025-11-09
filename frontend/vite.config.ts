@@ -18,6 +18,19 @@ export default defineConfig({
   },
   server: {
     port: 3000, // Default Vite dev server port
+    proxy: {
+      '/api': {
+        target: 'http://localhost:10000', // Backend runs on port 10000 (from .env PORT=10000)
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path, // Keep the /api prefix
+      },
+      '/health': {
+        target: 'http://localhost:10000', // Backend runs on port 10000 (from .env PORT=10000)
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   preview: {
     port: 3000, // Preview server port (for `vite preview` command)
