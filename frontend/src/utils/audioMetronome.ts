@@ -88,11 +88,18 @@ class AudioMetronome {
     // Set up interval for subsequent beeps
     // In browser environments, setInterval returns a number
     this.intervalId = window.setInterval(() => {
-      if (this.isPlaying) {
-        this.playBeep().catch((error) => {
-          console.warn('Could not play beep in interval:', error);
-        });
+      // Double-check isPlaying before playing beep
+      if (!this.isPlaying) {
+        // If stopped, clear the interval
+        if (this.intervalId !== null) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        return;
       }
+      this.playBeep().catch((error) => {
+        console.warn('Could not play beep in interval:', error);
+      });
     }, intervalMs) as unknown as number;
   }
 
@@ -100,11 +107,17 @@ class AudioMetronome {
    * Stop metronome completely
    */
   stop(): void {
+    console.log('[AudioMetronome] Stopping metronome');
     this.isPlaying = false;
     this.onBeatCallback = null;
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    // Also try to stop any ongoing audio context if needed
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      // Don't close the context, just ensure it's stopped
+      // Closing would require recreating it later
     }
   }
 

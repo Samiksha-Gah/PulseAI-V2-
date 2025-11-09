@@ -274,7 +274,14 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
         <FeedbackPanel
           metrics={metrics}
           metronomeEnabled={metronomeEnabled}
-          onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
+          onMetronomeToggle={() => {
+            const newState = !metronomeEnabled;
+            setMetronomeEnabled(newState);
+            // Immediately stop metronome if toggling off
+            if (!newState) {
+              audioMetronome.stop();
+            }
+          }}
           onSaveVideo={handleSaveVideo}
           onSummarizeSession={handleSummarizeSession}
         />

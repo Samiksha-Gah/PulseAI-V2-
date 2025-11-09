@@ -13,6 +13,7 @@ import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
 import { API_ENDPOINTS } from '../config';
+import { audioMetronome } from '../utils/audioMetronome';
 import { SummaryModal } from './SummaryModal';
 
 
@@ -200,7 +201,14 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
         <FeedbackPanel
           metrics={metrics}
           metronomeEnabled={metronomeEnabled}
-          onMetronomeToggle={() => setMetronomeEnabled((s) => !s)}
+          onMetronomeToggle={() => {
+            const newState = !metronomeEnabled;
+            setMetronomeEnabled(newState);
+            // Immediately stop metronome if toggling off
+            if (!newState) {
+              audioMetronome.stop();
+            }
+          }}
           onSaveVideo={handleSaveMetrics}
           onSummarizeSession={handleSummarizeSession}
         />

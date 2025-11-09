@@ -63,7 +63,8 @@ export function Metronome({ targetBPM, currentBPM, isActive, audioEnabled = fals
       
       startAudio();
     } else {
-      // Stop audio if disabled
+      // Stop audio immediately if disabled
+      console.log('[Metronome] Audio disabled, stopping metronome');
       audioMetronome.stop();
     }
 
