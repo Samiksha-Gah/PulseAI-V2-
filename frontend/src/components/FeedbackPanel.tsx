@@ -3,10 +3,12 @@
  * Displays comprehensive CPR feedback with modern UI and color-coded auras
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
 import { motion } from 'framer-motion';
 import { audioFeedback } from '../utils/audioFeedback';
+import { AskQuestionModal } from './AskQuestionModal';
+import { audioMetronome } from '../utils/audioMetronome';
 export interface FeedbackPanelProps {
   metrics: CPRMetrics;
   metronomeEnabled?: boolean;
@@ -16,6 +18,20 @@ export interface FeedbackPanelProps {
 
 export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
+  const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+
+  // Handle muting metronome when asking a question
+  const handleAskStart = () => {
+    // Stop metronome audio (visual will continue)
+    // The Metronome component will automatically restart audio if metronomeEnabled is still true
+    audioMetronome.stop();
+  };
+
+  const handleAskEnd = () => {
+    // Metronome will resume automatically if it was enabled
+    // The audioFeedback.askQuestion already resumes audioFeedback
+  };
+
   // Show the highest priority message
   useEffect(() => {
     const priorities = [
@@ -273,6 +289,17 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
                     <span className="text-xs">Save</span>
                   </button>
                 </div>
+                
+                {/* Ask Question button - full width below metronome and save */}
+                <button
+                  onClick={() => setIsAskModalOpen(true)}
+                  className="w-full mt-3 px-3 py-2.5 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-sm flex items-center justify-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs">Ask Question</span>
+                </button>
               </div>
             </div>
           </div>
@@ -370,36 +397,58 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
               </div>
             </div>
 
-            {/* Buttons: Separate columns */}
-            <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-white/20">
-              {/* Metronome toggle button */}
-              {onMetronomeToggle ? (
+            {/* Buttons: Two rows */}
+            <div className="pt-1.5 border-t border-white/20 space-y-1.5">
+              {/* First row: Metronome and Save side by side */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {/* Metronome toggle button */}
+                {onMetronomeToggle ? (
+                  <button
+                    onClick={onMetronomeToggle}
+                    className="px-2 py-1 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                  >
+                    <span className="text-sm">{metronomeEnabled ? '🔊' : '🔇'}</span>
+                    <span className="text-[9px]">{metronomeEnabled ? 'ON' : 'OFF'}</span>
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+                
+                {/* Save Video button - always visible */}
                 <button
-                  onClick={onMetronomeToggle}
-                  className="px-2 py-1 bg-gray-700/80 text-white rounded-lg hover:bg-gray-600/80 transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                  onClick={onSaveVideo || (() => {})}
+                  disabled={!onSaveVideo}
+                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-700/80 disabled:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
                 >
-                  <span className="text-sm">{metronomeEnabled ? '🔊' : '🔇'}</span>
-                  <span className="text-[9px]">{metronomeEnabled ? 'ON' : 'OFF'}</span>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="text-[9px]">Save</span>
                 </button>
-              ) : (
-                <div></div>
-              )}
+              </div>
               
-              {/* Save Video button - always visible */}
+              {/* Second row: Ask Question button - full width */}
               <button
-                onClick={onSaveVideo || (() => {})}
-                disabled={!onSaveVideo}
-                className="px-2 py-1 bg-blue-600/80 hover:bg-blue-700/80 disabled:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
+                onClick={() => setIsAskModalOpen(true)}
+                className="w-full px-2 py-1 bg-purple-600/80 hover:bg-purple-700/80 text-white rounded-lg transition-colors font-semibold text-[10px] flex items-center justify-center gap-1"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-[9px]">Save</span>
+                <span className="text-[9px]">Ask Question</span>
               </button>
             </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Ask Question Modal */}
+      <AskQuestionModal
+        isOpen={isAskModalOpen}
+        onClose={() => setIsAskModalOpen(false)}
+        onAskStart={handleAskStart}
+        onAskEnd={handleAskEnd}
+      />
     </>
   );
 }

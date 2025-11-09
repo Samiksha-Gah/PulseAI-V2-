@@ -3,7 +3,7 @@
  * Step-by-step CPR instructions
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CameraFeed, CPRMetrics } from './CameraFeed';
 import { FeedbackPanel } from './FeedbackPanel';
 import { Metronome } from './Metronome';
@@ -26,6 +26,45 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
   const [currentStep, setCurrentStep] = useState<WalkthroughStep>('welcome');
   const [metrics, setMetrics] = useState<CPRMetrics | null>(null);
   const [metronomeEnabled, setMetronomeEnabled] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Keep a ref to latest metrics for sampling (avoid stale closures)
+  const metricsRef = useRef<CPRMetrics | null>(null);
+  useEffect(() => {
+    metricsRef.current = metrics;
+  }, [metrics]);
+
+  // Recorded data (one entry per second): { time, iso, metrics }
+  const recordedDataRef = useRef<Array<{ time: number; iso: string; metrics: CPRMetrics | null }>>([]);
+  const samplingIntervalRef = useRef<number | null>(null);
+
+  const startSampling = () => {
+    // Don't start if already sampling
+    if (samplingIntervalRef.current !== null) return;
+
+    // Push an immediate sample
+    recordedDataRef.current.push({
+      time: Date.now(),
+      iso: new Date().toISOString(),
+      metrics: metricsRef.current || null,
+    });
+
+    // Sample every 1000ms
+    samplingIntervalRef.current = window.setInterval(() => {
+      recordedDataRef.current.push({
+        time: Date.now(),
+        iso: new Date().toISOString(),
+        metrics: metricsRef.current || null,
+      });
+    }, 1000) as unknown as number;
+  };
+
+  const stopSampling = () => {
+    if (samplingIntervalRef.current !== null) {
+      clearInterval(samplingIntervalRef.current);
+      samplingIntervalRef.current = null;
+    }
+  };
 
   const steps: Record<WalkthroughStep, { title: string; instructions: string[] }> = {
     welcome: {
@@ -92,6 +131,46 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
     setMetrics(newMetrics);
   };
 
+  const handleCanvasReady = (canvas: HTMLCanvasElement) => {
+    canvasRef.current = canvas;
+    // Start per-second metrics sampling automatically when canvas is ready
+    startSampling();
+  };
+
+  const handleSaveVideo = async () => {
+    try {
+      // Download JSON of per-second sampled metrics
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `cpr-metrics-${timestamp}.json`;
+
+      const data = recordedDataRef.current;
+      if (!data || data.length === 0) {
+        alert('No metrics recorded yet');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), samples: data }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to save metrics JSON:', error);
+      alert('Failed to save metrics. Please try again.');
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopSampling();
+    };
+  }, []);
+
   const handleNext = () => {
     const stepOrder: WalkthroughStep[] = [
       'welcome',
@@ -152,12 +231,16 @@ export function WalkthroughMode({ onSkipToCompressions, onBack }: WalkthroughMod
       {/* Camera view (only during compressions) */}
       {showCamera ? (
         <>
-          <CameraFeed onMetricsUpdate={handleMetricsUpdate} />
+          <CameraFeed 
+            onMetricsUpdate={handleMetricsUpdate}
+            onCanvasReady={handleCanvasReady}
+          />
           {metrics && (
             <FeedbackPanel
               metrics={metrics}
               metronomeEnabled={metronomeEnabled}
               onMetronomeToggle={() => setMetronomeEnabled(!metronomeEnabled)}
+              onSaveVideo={handleSaveVideo}
             />
           )}
           <Metronome
