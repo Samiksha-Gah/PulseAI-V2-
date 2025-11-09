@@ -6,7 +6,6 @@
 class AudioMetronome {
   private audioContext: AudioContext | null = null;
   private intervalId: number | null = null;
-  private targetBPM: number = 100;
   private isPlaying: boolean = false;
   private onBeatCallback: (() => void) | null = null;
 
@@ -65,7 +64,6 @@ class AudioMetronome {
     // Wait a bit to ensure cleanup is complete
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    this.targetBPM = targetBPM;
     this.isPlaying = true;
     this.onBeatCallback = onBeat || null;
 
@@ -76,11 +74,12 @@ class AudioMetronome {
     await this.playBeep();
 
     // Set up interval for subsequent beeps
+    // In browser environments, setInterval returns a number
     this.intervalId = window.setInterval(() => {
       if (this.isPlaying) {
         this.playBeep();
       }
-    }, intervalMs);
+    }, intervalMs) as number;
   }
 
   /**
