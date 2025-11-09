@@ -106,31 +106,24 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
       console.log('[AskQuestionModal] Response redirected:', queryResponse.redirected);
       console.log('[AskQuestionModal] Response url:', queryResponse.url);
       console.log('[AskQuestionModal] Response headers (all):', Object.fromEntries(queryResponse.headers.entries()));
-      console.log('[AskQuestionModal] Response content-type:', queryResponse.headers.get('content-type'));
+      const contentType = queryResponse.headers.get('content-type');
+      console.log('[AskQuestionModal] Response content-type:', contentType);
       console.log('[AskQuestionModal] Response content-length:', queryResponse.headers.get('content-length'));
 
-      // Read response body (can only be read once)
-      let responseText;
-      try {
-        responseText = await queryResponse.text();
-        console.log('[AskQuestionModal] Response text read successfully');
-      } catch (textError) {
-        console.error('[AskQuestionModal] ERROR_CODE: READ_RESPONSE_BODY_FAILED');
-        console.error('[AskQuestionModal] Failed to read response body:', textError);
-        throw new Error(`ERROR_CODE: READ_RESPONSE_BODY_FAILED - Could not read response body. Error: ${textError instanceof Error ? textError.message : String(textError)}`);
-      }
-      
-      console.log('[AskQuestionModal] Response text (raw):', responseText);
-      console.log('[AskQuestionModal] Response text length:', responseText.length);
-      console.log('[AskQuestionModal] Response text type:', typeof responseText);
-      console.log('[AskQuestionModal] Response text is empty:', !responseText || responseText.length === 0);
-      console.log('[AskQuestionModal] Response text first 200 chars:', responseText.substring(0, 200));
-      console.log('[AskQuestionModal] Response text last 200 chars:', responseText.substring(Math.max(0, responseText.length - 200)));
-
+      // Check content type BEFORE reading body (body can only be read once)
       if (!queryResponse.ok) {
         const status = queryResponse.status;
-        const contentType = queryResponse.headers.get('content-type');
         console.error('[AskQuestionModal] ERROR_CODE: HTTP_ERROR - Status:', status, 'Content-Type:', contentType);
+        
+        // Read error response body (only if not audio)
+        let responseText = '';
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            responseText = await queryResponse.text();
+          } catch (textError) {
+            console.error('[AskQuestionModal] Failed to read error response:', textError);
+          }
+        }
         
         // Categorize error by status code
         let errorType = 'UNKNOWN_ERROR';
@@ -156,7 +149,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
         let errorMessage = `ERROR_CODE: HTTP_${status}_${errorType}`;
         let errorDetails = '';
         
-        if (contentType && contentType.includes('application/json')) {
+        if (contentType && contentType.includes('application/json') && responseText) {
           try {
             const errorData = JSON.parse(responseText);
             console.error('[AskQuestionModal] ERROR_CODE: HTTP_ERROR - Parsed error response:', errorData);
@@ -248,82 +241,86 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
         throw new Error(fullErrorMessage);
       }
 
-      // Response is OK, parse JSON
-      console.log('[AskQuestionModal] ========== PARSING RESPONSE ==========');
-      let queryData;
-      try {
-        if (!responseText || responseText.trim().length === 0) {
-          console.error('[AskQuestionModal] ERROR_CODE: EMPTY_RESPONSE');
-          console.error('[AskQuestionModal] Response body is empty or whitespace only');
-          console.error('[AskQuestionModal] Response text value:', JSON.stringify(responseText));
-          throw new Error('ERROR_CODE: EMPTY_RESPONSE - Server returned empty response body');
-        }
+      // Response is OK - check if it's audio or JSON
+      console.log('[AskQuestionModal] Response Content-Type:', contentType);
+      
+      if (contentType && contentType.includes('audio/mpeg')) {
+        // Handle audio response - read as blob (body can only be read once)
+        console.log('[AskQuestionModal] Received audio response');
         
-        console.log('[AskQuestionModal] Attempting JSON.parse on response text');
-        queryData = JSON.parse(responseText);
-        console.log('[AskQuestionModal] JSON.parse successful');
-        console.log('[AskQuestionModal] Parsed query data type:', typeof queryData);
-        console.log('[AskQuestionModal] Parsed query data:', queryData);
-        console.log('[AskQuestionModal] Parsed query data (stringified):', JSON.stringify(queryData));
-        console.log('[AskQuestionModal] Has answer property?', 'answer' in (queryData || {}));
-        console.log('[AskQuestionModal] Answer value:', queryData?.answer);
-        console.log('[AskQuestionModal] Answer value type:', typeof queryData?.answer);
-        console.log('[AskQuestionModal] Answer value length:', queryData?.answer?.length);
-        console.log('[AskQuestionModal] Full queryData keys:', Object.keys(queryData || {}));
-        console.log('[AskQuestionModal] Full queryData structure:', JSON.stringify(queryData, null, 2));
-      } catch (parseError) {
-        console.error('[AskQuestionModal] ========== JSON PARSE ERROR ==========');
-        console.error('[AskQuestionModal] ERROR_CODE: JSON_PARSE_FAILED');
-        console.error('[AskQuestionModal] Parse error type:', typeof parseError);
-        console.error('[AskQuestionModal] Parse error name:', parseError instanceof Error ? parseError.name : 'N/A');
-        console.error('[AskQuestionModal] Parse error message:', parseError instanceof Error ? parseError.message : String(parseError));
-        console.error('[AskQuestionModal] Parse error stack:', parseError instanceof Error ? parseError.stack : 'N/A');
-        console.error('[AskQuestionModal] Response text that failed to parse:', responseText);
-        console.error('[AskQuestionModal] Response text length:', responseText?.length);
-        console.error('[AskQuestionModal] Response text type:', typeof responseText);
-        console.error('[AskQuestionModal] Response text first 500 chars:', responseText?.substring(0, 500));
-        console.error('[AskQuestionModal] Response text last 500 chars:', responseText?.substring(Math.max(0, (responseText?.length || 0) - 500)));
-        console.error('[AskQuestionModal] Response text char codes (first 50):', responseText?.substring(0, 50).split('').map(c => c.charCodeAt(0)));
-        throw new Error(`ERROR_CODE: JSON_PARSE_FAILED - Invalid JSON from server. Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Response preview: "${responseText?.substring(0, 200)}..."`);
+        // Get truncated text from header
+        const answerText = queryResponse.headers.get('X-Answer-Text') || 'Audio response received';
+        const serviceUsed = queryResponse.headers.get('X-Service') || 'unknown';
+        
+        console.log('[AskQuestionModal] Truncated answer text:', answerText);
+        console.log('[AskQuestionModal] Service used:', serviceUsed);
+        
+        // Convert response to blob and create audio URL (read body only once)
+        const audioBlob = await queryResponse.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Create audio element and play
+        const audio = new Audio(audioUrl);
+        setIsPlayingAudio(true);
+        
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          URL.revokeObjectURL(audioUrl); // Clean up
+          audioFeedback.resume();
+          onAskEnd?.();
+        };
+        
+        audio.onerror = (err) => {
+          console.error('[AskQuestionModal] Audio playback error:', err);
+          setIsPlayingAudio(false);
+          URL.revokeObjectURL(audioUrl);
+          setError('Failed to play audio response');
+          audioFeedback.resume();
+          onAskEnd?.();
+        };
+        
+        // Play audio
+        await audio.play();
+        
+        // Display truncated text
+        setAnswer(answerText);
+        setService(serviceUsed);
+        setError(null);
+        setIsAsking(false);
+      } else {
+        // Handle JSON response (fallback - should not happen with audio responses)
+        console.log('[AskQuestionModal] ========== PARSING JSON RESPONSE ==========');
+        let queryData;
+        try {
+          // Read response body as text (only if not already read)
+          const responseText = await queryResponse.text();
+          
+          if (!responseText || responseText.trim().length === 0) {
+            throw new Error('ERROR_CODE: EMPTY_RESPONSE - Server returned empty response body');
+          }
+          
+          queryData = JSON.parse(responseText);
+          
+          if (queryData?.error) {
+            throw new Error(`ERROR_CODE: RESPONSE_HAS_ERROR_FIELD - ${queryData.error}`);
+          }
+          
+          if (queryData?.answer) {
+            setAnswer(queryData.answer);
+            setService(queryData.service || null);
+            setError(null);
+            setIsAsking(false);
+            setIsPlayingAudio(false);
+            audioFeedback.resume();
+            onAskEnd?.();
+          } else {
+            throw new Error('ERROR_CODE: MISSING_ANSWER_FIELD - No answer in response');
+          }
+        } catch (parseError) {
+          console.error('[AskQuestionModal] JSON parse error:', parseError);
+          throw parseError;
+        }
       }
-      
-      // Check if response has error field instead of answer
-      if (queryData?.error) {
-        console.error('[AskQuestionModal] ERROR_CODE: RESPONSE_HAS_ERROR_FIELD - Response contains error:', queryData.error);
-        throw new Error(`ERROR_CODE: RESPONSE_HAS_ERROR_FIELD - ${queryData.error}`);
-      }
-      
-      if (!queryData) {
-        console.error('[AskQuestionModal] ERROR_CODE: NULL_RESPONSE_DATA - queryData is null or undefined');
-        throw new Error('ERROR_CODE: NULL_RESPONSE_DATA - Server returned null or undefined data');
-      }
-      
-      if (!queryData.answer) {
-        console.error('[AskQuestionModal] ERROR_CODE: MISSING_ANSWER_FIELD - Invalid response structure:', queryData);
-        console.error('[AskQuestionModal] ERROR_CODE: MISSING_ANSWER_FIELD - Available keys:', Object.keys(queryData));
-        throw new Error(`ERROR_CODE: MISSING_ANSWER_FIELD - No answer field in response. Response structure: ${JSON.stringify(queryData)}`);
-      }
-      
-      if (typeof queryData.answer !== 'string') {
-        console.error('[AskQuestionModal] ERROR_CODE: INVALID_ANSWER_TYPE - Answer is not a string:', typeof queryData.answer, queryData.answer);
-        throw new Error(`ERROR_CODE: INVALID_ANSWER_TYPE - Answer is not a string. Type: ${typeof queryData.answer}, Value: ${String(queryData.answer)}`);
-      }
-      
-      if (queryData.answer.trim().length === 0) {
-        console.error('[AskQuestionModal] ERROR_CODE: EMPTY_ANSWER - Answer is empty string');
-        throw new Error('ERROR_CODE: EMPTY_ANSWER - Answer received but it is empty');
-      }
-
-      // 2. Display the answer (no TTS for now)
-      console.log('[AskQuestionModal] Setting answer:', queryData.answer);
-      console.log('[AskQuestionModal] Service used:', queryData.service);
-      setAnswer(queryData.answer);
-      setService(queryData.service || null); // Store which service was used
-      setError(null); // Clear any previous errors
-      setIsAsking(false);
-      setIsPlayingAudio(false);
-      audioFeedback.resume();
-      onAskEnd?.();
     } catch (err) {
       console.error('[AskQuestionModal] ERROR_CODE: CATCH_BLOCK - Failed to ask question:', err);
       console.error('[AskQuestionModal] ERROR_CODE: CATCH_BLOCK - Error type:', typeof err);

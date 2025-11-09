@@ -16,6 +16,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VOICE_ID = process.env.VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // Default: Sarah voice
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+const ANSWER_MAX_WORDS = parseInt(process.env.ANSWER_MAX_WORDS || '20', 10);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -75,11 +76,8 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-// Query endpoint with Gemini + TTS
+// Query endpoint with Gemini + OpenAI fallback + TTS
 app.post('/api/query', async (req, res) => {
-  console.log(`[Query] Received request: ${req.method} ${req.path}`);
-  console.log(`[Query] Request body:`, req.body);
-  console.log(`[Query] Request headers:`, req.headers);
   const { question, context } = req.body;
 
   if (!question) {
@@ -88,19 +86,11 @@ app.post('/api/query', async (req, res) => {
 
   // Try Gemini first, fall back to OpenAI
   if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
-    return res.status(500).json({ 
-      error: 'Neither Gemini nor OpenAI API key is configured',
-      errorType: 'API_KEY_MISSING',
-      details: 'At least one API key (GEMINI_API_KEY or OPENAI_API_KEY) must be set'
-    });
+    return res.status(500).json({ error: 'Neither Gemini nor OpenAI API key is configured' });
   }
 
   if (!ELEVENLABS_API_KEY) {
-    return res.status(500).json({ 
-      error: 'ElevenLabs API key not configured',
-      errorType: 'API_KEY_MISSING',
-      details: 'ELEVENLABS_API_KEY environment variable is not set'
-    });
+    return res.status(500).json({ error: 'ElevenLabs API key not configured' });
   }
 
   try {
@@ -112,15 +102,15 @@ app.post('/api/query', async (req, res) => {
     // 1. Try Gemini first if available
     if (GEMINI_API_KEY) {
       try {
-        console.log('[Query] Attempting Gemini API...');
-        
         // Build Gemini request body and log it to help debug 400s from the upstream API
+        const brevityInstruction = `Provide a concise answer in one short sentence (max ${ANSWER_MAX_WORDS} words). Keep it direct and actionable.`;
+
         const geminiRequestBody = {
           contents: [
             {
               parts: [
                 {
-                  text: `You are a professional CPR instructor providing real-time guidance. Context: ${context || 'CPR training session'}. Answer the following question concisely in 2-3 sentences, as if speaking to someone during training. Question: ${question}`
+                  text: `You are a professional CPR instructor providing real-time guidance. Context: ${context || 'CPR training session'}. ${brevityInstruction} Answer the following question as if speaking to someone during training. Question: ${question}`
                 }
               ]
             }
@@ -184,7 +174,7 @@ app.post('/api/query', async (req, res) => {
               const listRes = await fetch(listUrl, { method: 'GET' });
               const listJson = await listRes.json().catch(() => null);
               console.error('[Query] Gemini models list:', listJson);
-              // Don't return error here, let it fall through to OpenAI
+              // Don't return error, fall through to OpenAI
             } catch (listErr) {
               console.error('[Query] Failed to list models:', listErr);
             }
@@ -211,8 +201,9 @@ app.post('/api/query', async (req, res) => {
               }
             };
 
+            let answer = null;
             // Common locations
-            answer = tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text');
+            answer = answer || tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text');
             answer = answer || tryGet(geminiData, 'candidates', 0, 'content', 0, 'text');
             answer = answer || tryGet(geminiData, 'output', 0, 'content', 0, 'text');
             answer = answer || tryGet(geminiData, 'output', 0, 'content', 0, 'parts', 0, 'text');
@@ -247,16 +238,14 @@ app.post('/api/query', async (req, res) => {
               if (retryResult.ok) {
                 geminiData = retryResult.json;
                 console.log('[Query] Gemini raw response (retry):', JSON.stringify(geminiData));
-                // attempt extraction again
-                answer = tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text') || 
-                         tryGet(geminiData, 'candidates', 0, 'content', 0, 'text') || 
-                         tryGet(geminiData, 'output', 0, 'content', 0, 'text');
+                answer = tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text') || tryGet(geminiData, 'candidates', 0, 'content', 0, 'text') || tryGet(geminiData, 'output', 0, 'content', 0, 'text');
                 truncated = geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].finishReason === 'MAX_TOKENS';
               }
             }
 
             if (answer && typeof answer === 'string' && answer.trim().length > 0) {
               serviceUsed = 'gemini';
+              answer = answer; // Use the extracted answer
               console.log(`[Query] Gemini Answer: "${answer}"`);
             } else {
               console.error('[Query] No textual answer found in Gemini response', geminiData);
@@ -272,107 +261,128 @@ app.post('/api/query', async (req, res) => {
 
     // 2. Fall back to OpenAI if Gemini didn't work
     if (!answer && OPENAI_API_KEY) {
-      console.log('[Query] Using OpenAI API...');
-      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      try {
+        console.log('[Query] Using OpenAI API...');
+        const brevityInstruction = `Provide a concise answer in one short sentence (max ${ANSWER_MAX_WORDS} words). Keep it direct and actionable.`;
+        
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              {
+                role: 'system',
+                content: `You are a professional CPR instructor providing real-time guidance during CPR training. ${brevityInstruction}`
+              },
+              {
+                role: 'user',
+                content: `Context: ${context || 'CPR training session - user is practicing compressions'}. Question: ${question}`
+              }
+            ],
+            max_tokens: 200,
+            temperature: 0.7
+          })
+        });
+
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error('[Query] OpenAI error:', errorText);
+          return res.status(500).json({ error: 'OpenAI API failed', details: errorText });
+        }
+
+        const openaiData = await openaiResponse.json();
+        if (!openaiData.choices || openaiData.choices.length === 0) {
+          console.error('[Query] No choices in OpenAI response');
+          return res.status(500).json({ error: 'No response from OpenAI' });
+        }
+
+        const choice = openaiData.choices[0];
+        if (!choice.message || !choice.message.content) {
+          console.error('[Query] Invalid OpenAI response structure');
+          return res.status(500).json({ error: 'Invalid response structure from OpenAI' });
+        }
+
+        answer = choice.message.content;
+        if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
+          console.error('[Query] Empty or invalid answer from OpenAI');
+          return res.status(500).json({ error: 'AI response failed: Received empty answer from OpenAI' });
+        }
+        
+        serviceUsed = 'openai';
+        console.log(`[Query] OpenAI Answer: "${answer}"`);
+      } catch (openaiError) {
+        console.error('[Query] OpenAI request failed:', openaiError);
+        return res.status(500).json({ error: 'OpenAI API failed', details: openaiError.message });
+      }
+    }
+
+    if (!answer) {
+      return res.status(500).json({ error: 'AI response failed', details: 'Both Gemini and OpenAI failed to generate a response' });
+    }
+
+    console.log(`[Query] Answer: "${answer}"`);
+
+    // Truncate server-side to ANSWER_MAX_WORDS to guarantee brevity
+    const truncateWords = (str, maxWords) => {
+      if (!str || typeof str !== 'string') return str;
+      const words = str.trim().split(/\s+/);
+      if (words.length <= maxWords) return str.trim();
+      return words.slice(0, maxWords).join(' ') + '...';
+    };
+
+    const finalAnswer = truncateWords(answer, ANSWER_MAX_WORDS);
+    if (finalAnswer !== answer) console.log('[Query] Answer truncated to max words:', ANSWER_MAX_WORDS);
+
+    // If client requested a text response, return JSON instead of generating TTS
+    if (req.body && (req.body.return === 'text' || req.body.returnText === true || req.query.response === 'text')) {
+      console.log('[Query] Returning text response to client (no TTS)');
+      return res.json({ answer: finalAnswer, service: serviceUsed || 'unknown' });
+    }
+
+    // Convert answer to speech using ElevenLabs
+    const ttsResponse = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'xi-api-key': ELEVENLABS_API_KEY
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a professional CPR instructor providing real-time guidance during CPR training. Answer questions concisely in 2-3 sentences, as if speaking to someone during active CPR practice.'
-            },
-            {
-              role: 'user',
-              content: `Context: ${context || 'CPR training session - user is practicing compressions'}. Question: ${question}`
-            }
-          ],
-          max_tokens: 200,
-          temperature: 0.7
+          text: finalAnswer,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.0,
+            use_speaker_boost: true
+          }
         })
-      });
+      }
+    );
 
-      if (!openaiResponse.ok) {
-        const errorText = await openaiResponse.text();
-        console.error('[Query] OpenAI error:', errorText);
-        let errorType = 'OPENAI_API_ERROR';
-        if (openaiResponse.status === 401 || openaiResponse.status === 403) {
-          errorType = 'API_KEY_INVALID';
-        } else if (openaiResponse.status === 429) {
-          errorType = 'RATE_LIMIT_EXCEEDED';
-        } else if (openaiResponse.status === 500 || openaiResponse.status === 502 || openaiResponse.status === 503) {
-          errorType = 'OPENAI_SERVICE_UNAVAILABLE';
-        }
-        return res.status(openaiResponse.status >= 400 && openaiResponse.status < 500 ? openaiResponse.status : 500).json({ 
-          error: 'OpenAI API failed', 
-          errorType: errorType,
-          details: errorText 
-        });
-      }
-
-      const openaiData = await openaiResponse.json();
-      if (!openaiData.choices || openaiData.choices.length === 0) {
-        console.error('[Query] No choices in OpenAI response');
-        return res.status(500).json({ 
-          error: 'No response from OpenAI',
-          errorType: 'AI_EMPTY_RESPONSE',
-          details: 'OpenAI API returned no choices in response'
-        });
-      }
-
-      const choice = openaiData.choices[0];
-      if (!choice.message || !choice.message.content) {
-        console.error('[Query] Invalid OpenAI response structure');
-        return res.status(500).json({ 
-          error: 'Invalid response structure from OpenAI',
-          errorType: 'AI_INVALID_RESPONSE',
-          details: 'OpenAI API returned invalid response structure'
-        });
-      }
-
-      answer = choice.message.content;
-      if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
-        console.error('[Query] Empty or invalid answer from OpenAI');
-        return res.status(500).json({ 
-          error: 'AI response failed: Received empty answer from OpenAI',
-          errorType: 'AI_EMPTY_RESPONSE',
-          details: 'OpenAI API returned a response but the content was empty'
-        });
-      }
-      
-      console.log(`[Query] OpenAI Answer: "${answer}"`);
-      if (!serviceUsed) {
-        serviceUsed = 'openai';
-      }
+    if (!ttsResponse.ok) {
+      const errorText = await ttsResponse.text().catch(() => '<no body>');
+      console.error('[Query] TTS error:', ttsResponse.status, errorText);
+      return res.status(ttsResponse.status).json({ error: 'TTS generation failed', details: errorText });
     }
 
-    // 2. Validate and return text answer (frontend will call TTS endpoint separately)
-    if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
-      console.error('[Query] Invalid answer received:', answer);
-      return res.status(500).json({ 
-        error: 'AI response failed: Received empty or invalid answer',
-        errorType: 'AI_INVALID_RESPONSE',
-        details: `Answer type: ${typeof answer}, value: ${answer}`
-      });
-    }
+    const audioBuffer = await ttsResponse.arrayBuffer();
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('X-Answer-Text', finalAnswer); // Include text in header for frontend
+    res.set('X-Service', serviceUsed || 'unknown'); // Include service in header
+    res.send(Buffer.from(audioBuffer));
     
-    console.log(`[Query] Success: Returning text answer (powered by ${serviceUsed || 'unknown'})`);
-    res.setHeader('Content-Type', 'application/json');
-    res.json({ 
-      answer: answer,
-      service: serviceUsed || 'unknown' // 'gemini' or 'openai'
-    });
+    console.log(`[Query] Success: ${audioBuffer.byteLength} bytes (powered by ${serviceUsed || 'unknown'})`);
   } catch (err) {
-    console.error('[Query] Error:', err);
-    res.status(500).json({ 
-      error: 'Query request failed', 
-      errorType: 'SERVER_ERROR',
-      details: err.message 
-    });
+    console.error('[Query] Error:', err && err.stack ? err.stack : err);
+    const details = err && err.message ? err.message : String(err);
+    const stack = err && err.stack ? err.stack : undefined;
+    res.status(500).json({ error: 'Query request failed', details, stack });
   }
 });
 
@@ -380,7 +390,6 @@ app.post('/api/query', async (req, res) => {
 app.use((req, res) => {
   console.error(`[404] Route not found: ${req.method} ${req.path}`);
   console.error(`[404] Request URL: ${req.url}`);
-  console.error(`[404] Request headers:`, req.headers);
   res.status(404).json({ 
     error: 'Route not found',
     errorType: 'ROUTE_NOT_FOUND',
@@ -398,4 +407,5 @@ app.listen(PORT, () => {
   console.log(`🤖 Gemini Model: ${GEMINI_MODEL}`);
   console.log(`🔑 OpenAI API: ${OPENAI_API_KEY ? '✓ Configured' : '✗ Missing'}`);
   console.log(`🎤 Voice ID: ${VOICE_ID}`);
+  console.log(`📏 Answer Max Words: ${ANSWER_MAX_WORDS}`);
 });
