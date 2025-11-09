@@ -1,192 +1,216 @@
-# PulseAI
+# PulseAI: AI-Powered CPR Training Assistant
 
-PulseAI is a CPR training assistant that provides real-time guidance and session summaries using AI (Google Gemini and OpenAI), plus text-to-speech (ElevenLabs). The project contains a frontend (React + Vite + TypeScript) and a Node/Express backend that proxies requests to LLMs and TTS services, transcribes audio, and returns concise, actionable answers suitable for live CPR coaching.
+[![Build Status](https://img.shields.io/shields/build.svg)](https://example.com/build)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![React](https://img.shields.io/badge/React-18.2.0-blue)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
 
-This README is meant to be a single reference for developers running the project locally or deploying it. It documents repository structure, environment variables, how to run the app, API endpoints, common troubleshooting, and security best practices.
+**PulseAI** is a web-based CPR training assistant that provides real-time, AI-powered feedback on your technique. Using just your webcam, PulseAI analyzes your compression rate, depth, and hand placement to help you perform high-quality CPR. It also features an integrated AI assistant (powered by Google Gemini and OpenAI) to answer your questions during training.
 
-## Table of contents
-- Project structure
-- Quick start (dev)
-- Backend setup
-- Frontend setup
-- Environment variables
-- API endpoints (server)
-- Troubleshooting & common errors
-- Security & secrets
-- Testing & validation
-- Deployment notes
+This repository contains the complete monorepo for PulseAI, including the React frontend and the Node.js/Express backend.
 
 ---
 
-## Project structure
+## Table of Contents
 
-Top-level:
-
-- `backend/` — Express server, handles: /api/query, /api/transcribe, /api/tts, /api/summarize, health
-- `frontend/` — React + Vite app (TypeScript). Main UI and components live here, including `AskQuestionModal.tsx`.
-- `PROJECT_STORY.md`, `QUICK_FIX_RENDER.md`, `RENDER_DEPLOYMENT.md`, `replacements.txt` — project notes and docs
-
-Frontend important files:
-- `frontend/src/main.tsx`, `frontend/src/App.tsx` — app entry
-- `frontend/src/components/AskQuestionModal.tsx` — modal that queries backend and plays TTS
-- `frontend/package.json` — scripts: `dev`, `build`, `preview`
-
-Backend important files:
-- `backend/server.js` — Express application
-- `backend/package.json` — start/dev scripts
-- `backend/.env` (local; not committed) — environment variables (API keys)
+-   [Features](#features)
+-   [Technology Stack](#technology-stack)
+-   [Project Structure](#project-structure)
+-   [Local Development](#local-development)
+    -   [Prerequisites](#prerequisites)
+    -   [Installation & Setup](#installation--setup)
+-   [Environment Variables](#environment-variables)
+-   [API Endpoints](#api-endpoints)
+-   [Deployment](#deployment)
+-   [Troubleshooting](#troubleshooting)
+-   [Security & Secrets](#security--secrets)
+-   [License](#license)
 
 ---
 
-## Quick start (development)
+## Features
 
-Prereqs:
-- Node.js (16+ recommended) and npm
-- A modern browser
-
-1. Clone the repository and open the project root.
-2. Install dependencies for both packages:
-
-```powershell
-# from project root
-cd frontend
-npm install
-cd ../backend
-npm install
-```
-
-3. Provide environment variables (see next section). Create `backend/.env` from `.env.example` and fill in keys (do NOT commit this file).
-
-4. Start backend and frontend in separate terminals:
-
-```powershell
-# Backend (PowerShell)
-cd "<project-root>\backend"
-npm run dev
-
-# Frontend (PowerShell)
-cd "<project-root>\frontend"
-npm run dev
-```
-
-Open the frontend URL shown by Vite (typically http://localhost:5173) and the backend runs on http://localhost:3001 by default.
+* **Real-time CPR Metrics:** Get immediate visual feedback on your **BPM**, **compression depth** (mm), and **hand placement** using your webcam.
+* **AI-Powered Q&A:** Ask CPR-related questions (via text or voice) and get concise, audible answers from **Google Gemini** or **OpenAI**.
+* **Voice Transcription & TTS:** Uses **OpenAI Whisper** for speech-to-text and **ElevenLabs** for realistic text-to-speech responses.
+* **Two Training Modes:**
+    * **Bystander Mode:** A step-by-step walkthrough for first-time responders.
+    * **EMT Mode:** Advanced real-time analysis for trained professionals to refine their technique.
+* **Audio/Visual Metronome:** A pulsing visual indicator and optional audio beeps to guide your compression rhythm at the target 100-120 BPM.
+* **Session Data Export:** Save your per-second CPR metrics as a JSON file for review.
 
 ---
 
-## Backend setup (detailed)
+## Technology Stack
 
-1. Create a `.env` file in `backend/` (copy `.env.example`) and replace placeholders with your keys:
+### Frontend
+* **Framework:** React 18 with TypeScript
+* **Build Tool:** Vite
+* **Pose Detection:** TensorFlow.js (MoveNet)
+* **Styling:** TailwindCSS
+* **Animations:** Framer Motion
 
-```
-PORT=3001
-ELEVENLABS_API_KEY=YOUR_ELEVENLABS_KEY
-VOICE_ID=EXAVITQu4vr4xnSDxMaL
-GEMINI_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY
-OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-```
+### Backend
+* **Runtime:** Node.js
+* **Framework:** Express
+* **File Uploads:** Multer
 
-2. Start server:
-
-```powershell
-cd backend
-npm run dev
-```
-
-The server will print a short health-check and configured keys (it will only say 'configured' or 'missing' — real keys are not printed).
-
-### Notes
-- The backend proxies requests to external AI/TTS APIs and includes logic to try Gemini first and fall back to OpenAI when appropriate. It also converts AI answers to TTS via ElevenLabs.
-- If OpenAI returns an `invalid_api_key` error, the backend now returns HTTP 401 with `errorType: 'API_KEY_INVALID'` to help the frontend provide a clear message. Rotate/revoke keys if exposed.
+### AI & External Services
+* **Generative AI:** Google Gemini (primary) & OpenAI (fallback)
+* **Speech-to-Text:** OpenAI Whisper
+* **Text-to-Speech:** ElevenLabs
 
 ---
 
-## Frontend setup
+## Project Structure
 
-1. Install dependencies and run dev server:
+The project is a monorepo containing the frontend and backend in separate directories.
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-2. The app uses a small Vite proxy in development so relative API URLs like `/api/query` are proxied to the backend.
-
-3. Build for production:
-
-```powershell
-cd frontend
-npm run build
-```
+/ ├── backend/ # Node.js/Express server │ ├── server.js # Main API server logic │ ├── package.json # Backend dependencies │ └── .env # (Not committed) API keys and secrets │ ├── frontend/ # React/Vite client application │ ├── src/ │ │ ├── components/ # React components (CameraFeed, FeedbackPanel, etc.) │ │ ├── utils/ # CPR logic, audio handlers, config │ │ └── App.tsx # Main application component │ ├── package.json # Frontend dependencies │ └── vite.config.ts # Vite configuration with backend proxy │ └── README.md # This file
 
 ---
 
-## Environment variables (summary)
+## Local Development
 
-Backend - `backend/.env` (example keys shown in `backend/.env.example` as placeholders):
+### Prerequisites
 
-- PORT — server port (default 3001)
-- ELEVENLABS_API_KEY — API key for ElevenLabs TTS
-- VOICE_ID — ElevenLabs voice id
-- GEMINI_API_KEY — Google Gemini (Generative Language) API key
-- OPENAI_API_KEY — OpenAI API key (used for Whisper, chat completions fallback)
+* Node.js (v16+ recommended)
+* npm (v8+ recommended)
+* A modern web browser (Chrome, Firefox, Edge)
+* API keys for **OpenAI**, **Google Gemini**, and **ElevenLabs**
 
-Important: Do not commit `.env` to the repo. The repo `.gitignore` excludes `backend/.env`.
+### Installation & Setup
+
+1.  **Clone the Repository:**
+    ```sh
+    git clone [https://github.com/your-username/pulseai-v2.git](https://github.com/your-username/pulseai-v2.git)
+    cd pulseai-v2
+    ```
+
+2.  **Install Backend Dependencies:**
+    ```sh
+    cd backend
+    npm install
+    ```
+
+3.  **Install Frontend Dependencies:**
+    ```sh
+    cd ../frontend
+    npm install
+    ```
+
+4.  **Set Up Environment Variables:**
+    * In the `backend/` directory, create a file named `.env`.
+    * Copy the contents of `backend/.env.example` (if present) or use the list from the [Environment Variables](#environment-variables) section below.
+    * Add your API keys to this file. **Do not commit this file.**
+    ```env
+    # backend/.env
+    PORT=3001
+    ELEVENLABS_API_KEY=your_elevenlabs_key
+    GEMINI_API_KEY=your_gemini_key
+    OPENAI_API_KEY=your_openai_key
+    VOICE_ID=EXAVITQu4vr4xnSDxMaL
+    ```
+
+5.  **Run the Servers:**
+    You will need two separate terminals.
+
+    * **Terminal 1: Start the Backend**
+        ```sh
+        cd backend
+        npm run dev
+        # Server will run on http://localhost:3001
+        ```
+
+    * **Terminal 2: Start the Frontend**
+        ```sh
+        cd frontend
+        npm run dev
+        # App will be available at http://localhost:5173 (or as shown)
+        ```
+
+6.  **Open the App:**
+    Open the frontend URL (e.g., `http://localhost:5173`) in your browser. The frontend is configured to proxy `/api` requests to the backend server.
 
 ---
 
-## API endpoints (backend)
+## Environment Variables
 
-All endpoints live under the backend server (default `http://localhost:3001`):
+The backend server requires the following environment variables to be set in a `backend/.env` file.
 
-- GET `/health` — basic health check
-- POST `/api/tts` — accepts JSON { text } and returns `audio/mpeg` (ElevenLabs)
-- POST `/api/transcribe` — accepts form-data `audio` file and returns transcription JSON `{ text }` (OpenAI Whisper)
-- POST `/api/query` — accepts JSON `{ question, context?, returnText? }` and returns an audio response (`audio/mpeg`) with the text included in header `X-Answer-Text`. If `returnText` is set or `response=text`, the server returns JSON `{ answer, service }` instead of TTS audio.
-- POST `/api/summarize` — accepts a session JSON and returns a structured summary (tries Gemini then OpenAI)
-
-Error behavior:
-- If an upstream service returns an error, the backend returns a helpful error JSON. If OpenAI reports an invalid API key, the backend returns HTTP 401 with `errorType: 'API_KEY_INVALID'`.
-
----
-
-## Troubleshooting & common errors
-
-- `ERROR_CODE: FETCH_FAILED` or frontend can't reach `/api/query`: Check backend is running on `PORT` and Vite proxy is configured, or use the full backend URL in `frontend/src/config.ts`.
-- `OpenAI API key invalid` / `invalid_api_key`: Revoke and rotate your OpenAI key immediately, update `backend/.env`, and restart the backend. Do NOT commit keys.
-- `Audio playback error` when playing TTS: Check CORS, ensure backend returns `Content-Type: audio/mpeg` and the `X-Answer-Text` header is present.
-- Large bundle warnings (Vite): The app currently bundles a lot of TFJS/Tensorflow modules. For production, consider dynamic imports for heavy modules and enable code-splitting.
-
-If you need a fast check, run the backend health endpoint:
-
-```powershell
-Invoke-RestMethod http://localhost:3001/health
-```
+| Variable | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `PORT` | The port for the backend server to run on. | `3001` | Optional |
+| `ELEVENLABS_API_KEY` | Your API key for ElevenLabs TTS. | - | **Yes** |
+| `VOICE_ID` | The ElevenLabs voice ID to use for TTS. | `EXAVITQu4vr4xnSDxMaL` (Sarah) | Optional |
+| `GEMINI_API_KEY` | Your API key for Google Gemini (Generative AI). | - | **Yes** |
+| `OPENAI_API_KEY` | Your API key for OpenAI (Whisper & GPT fallback). | - | **Yes** |
+| `GEMINI_MODEL` | The specific Gemini model to use. | `gemini-2.5-pro` | Optional |
+| `ANSWER_MAX_WORDS` | Truncates AI text answers to this many words. | `20` | Optional |
 
 ---
 
-## Security & secrets
+## API Endpoints
 
-- Treat API keys as secrets. If you accidentally expose a key (e.g., commit it), assume it is compromised: revoke it in the provider dashboard and rotate to a new key.
-- `backend/.env` must remain local and be listed in `.gitignore` (the repository already ignores `backend/.env`). If you have committed secrets, remove them from the repository and remote history (use BFG or git filter-repo) or at minimum `git rm --cached backend/.env` and rotate keys.
-- Avoid logging full API keys. The backend should log `✓ Configured` vs `✗ Missing` rather than the keys themselves. Consider adding masking for accidental prints.
+The backend server exposes the following API endpoints:
+
+* `GET /health`
+    * A basic health check to confirm the server is running.
+* `POST /api/tts`
+    * Generates speech from text.
+    * **Body:** `{ "text": "Your text to synthesize" }`
+    * **Returns:** `audio/mpeg`
+* `POST /api/transcribe`
+    * Transcribes audio to text using OpenAI Whisper.
+    * **Body:** `multipart/form-data` with an `audio` file.
+    * **Returns:** `{ "text": "Transcribed text" }`
+* `POST /api/query`
+    * Asks a question to the AI (Gemini/OpenAI) and returns a spoken answer.
+    * **Body:** `{ "question": "Your question", "context": "Optional context" }`
+    * **Returns:** `audio/mpeg` (with text in `X-Answer-Text` header).
+* `POST /api/summarize`
+    * *Note: This endpoint is defined in the README but not fully implemented in `server.js`.*
 
 ---
 
-## Testing & validation
+## Deployment
 
-- There are no automated tests included by default. For changes to the AI proxy behavior, add unit tests around request/response parsing and error handling.
-- Quick smoke tests:
+To deploy this application, you must host the `frontend` (as a static site) and the `backend` (as a Node.js service).
 
-  - Start backend and call `/api/query` with `returnText: true` to avoid TTS and see JSON:
+* **Frontend:** Build the static files using `npm run build` inside the `frontend` directory and serve them from any static hosting provider (like Render, Vercel, or Netlify).
+* **Backend:** Deploy the `backend` directory as a Node.js service (e.g., on Render).
+* **Crucial:** You **must** set the [Environment Variables](#environment-variables) (like `GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.) in your hosting platform's dashboard.
+* **CORS:** The backend is configured with `cors()`, but ensure your frontend URL is allowed if you host them on different domains.
 
-  ```powershell
-  Invoke-RestMethod -Method POST -Uri http://localhost:3001/api/query -ContentType 'application/json' -Body '{"question":"how deep?","context":"CPR training","returnText":true}'
-  ```
+For detailed instructions on deploying to Render, see `RENDER_DEPLOYMENT.md`.
 
 ---
 
-## Deployment notes
+## Troubleshooting
 
-- Use environment variables on your hosting platform. Do not commit secrets to the repository.
-- If deploying frontend and backend together, consider serving the built frontend statically behind a simple web server and running the backend separately; configure CORS or an ingress/proxy to route `/api/*` to the backend.
+* **`FETCH_FAILED` or 404 on `/api/query`:**
+    * Ensure your backend server is running on `PORT` 3001.
+    * Check the browser console for network errors.
+* **`OpenAI API key invalid` / `API_KEY_INVALID`:**
+    * Your `OPENAI_API_KEY` in `backend/.env` is incorrect or has expired.
+    * Regenerate your key, update the file, and restart the backend.
+* **Audio playback error:**
+    * Check that your `ELEVENLABS_API_KEY` is correct and your account has credits.
+* **AI responses fail:**
+    * Check your `GEMINI_API_KEY` and `OPENAI_API_KEY`. The backend logs will show `✓ Configured` or `✗ Missing` for each key on startup.
+
+---
+
+## Security & Secrets
+
+**⚠️ Never commit your `.env` file or hardcode API keys in your code.**
+
+* All API keys are secrets and must be stored securely in a local `backend/.env` file, which is included in `.gitignore`.
+* When deploying, use your hosting provider's "secrets" or "environment variables" dashboard to set these values securely.
+* If you accidentally commit a key, **revoke it immediately** from the provider's dashboard and generate a new one.
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
