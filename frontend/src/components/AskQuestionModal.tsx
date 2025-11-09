@@ -23,9 +23,14 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
   const [isAsking, setIsAsking] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
-  const handleAsk = async () => {
-    if (!question.trim()) {
+  const handleAsk = async (useOpenAI = false, questionText?: string) => {
+    // Use provided questionText (from transcription) or fall back to state
+    const questionToAsk = questionText || question;
+    
+    if (!questionToAsk.trim()) {
       setError('Please enter a question');
       return;
     }
@@ -49,17 +54,23 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
       console.log('[AskQuestionModal] ========== REQUEST START ==========');
       console.log('[AskQuestionModal] Full API_ENDPOINTS object:', API_ENDPOINTS);
       console.log('[AskQuestionModal] Query endpoint URL:', API_ENDPOINTS.query);
+      console.log('[AskQuestionModal] Question to ask:', questionToAsk);
+      console.log('[AskQuestionModal] Use OpenAI:', useOpenAI);
       
       // Use the endpoint URL directly - config.ts ensures relative paths in dev mode
       // Relative paths (like /api/query) will be intercepted by Vite proxy
       // Absolute URLs (in production) will be used directly
-      const queryUrl = API_ENDPOINTS.query;
+      // If useOpenAI is true (from voice input), add query param to force OpenAI
+      let queryUrl = API_ENDPOINTS.query;
+      if (useOpenAI) {
+        queryUrl += (queryUrl.includes('?') ? '&' : '?') + 'useOpenAI=true';
+      }
       console.log('[AskQuestionModal] Final URL to use:', queryUrl);
       console.log('[AskQuestionModal] Is relative path:', !queryUrl.startsWith('http'));
       console.log('[AskQuestionModal] Request method: POST');
       console.log('[AskQuestionModal] Request headers:', { 'Content-Type': 'application/json' });
-      console.log('[AskQuestionModal] Request body:', { question: question.trim(), context });
-      console.log('[AskQuestionModal] Request body stringified:', JSON.stringify({ question: question.trim(), context }));
+      console.log('[AskQuestionModal] Request body:', { question: questionToAsk.trim(), context });
+      console.log('[AskQuestionModal] Request body stringified:', JSON.stringify({ question: questionToAsk.trim(), context }));
       console.log('[AskQuestionModal] Current window location:', window.location.href);
       console.log('[AskQuestionModal] Is development mode:', import.meta.env.DEV);
       console.log('[AskQuestionModal] VITE_BACKEND_URL env var:', import.meta.env.VITE_BACKEND_URL);
@@ -71,7 +82,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
         queryResponse = await fetch(queryUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: question.trim(), context }),
+          body: JSON.stringify({ question: questionToAsk.trim(), context }),
         });
         let fetchEndTime = Date.now();
         console.log('[AskQuestionModal] Fetch completed in:', fetchEndTime - fetchStartTime, 'ms');
@@ -376,8 +387,90 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+
+        // Convert audio to text
+        setIsAsking(true);
+        setError(null);
+        audioMetronome.stop();
+        audioFeedback.pause();
+        onAskStart?.();
+
+        try {
+          const { API_ENDPOINTS } = await import('../config');
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+
+          console.log('[AskQuestionModal] Sending audio for transcription...');
+          const transcriptionResponse = await fetch(API_ENDPOINTS.transcribe, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!transcriptionResponse.ok) {
+            const errorText = await transcriptionResponse.text();
+            throw new Error(`Transcription failed: ${errorText}`);
+          }
+
+          const transcriptionData = await transcriptionResponse.json();
+          const transcribedText = transcriptionData.text || transcriptionData.transcription;
+
+          if (!transcribedText || transcribedText.trim().length === 0) {
+            throw new Error('No transcription received');
+          }
+
+          console.log('[AskQuestionModal] Transcribed text:', transcribedText);
+          
+          // Update the textarea with transcribed text
+          setQuestion(transcribedText);
+          
+          // Use OpenAI for voice questions (faster) - pass transcribed text directly
+          await handleAsk(true, transcribedText);
+        } catch (transcriptionError) {
+          console.error('[AskQuestionModal] Transcription error:', transcriptionError);
+          setError(transcriptionError instanceof Error ? transcriptionError.message : 'Failed to transcribe audio');
+          setIsAsking(false);
+          audioFeedback.resume();
+          onAskEnd?.();
+        }
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('[AskQuestionModal] Failed to start recording:', err);
+      setError('Failed to access microphone. Please check permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
   const handleClose = () => {
-    if (!isAsking) {
+    if (!isAsking && !isRecording) {
+      if (mediaRecorder && isRecording) {
+        stopRecording();
+      }
       setQuestion('');
       setAnswer(null);
       setService(null);
@@ -388,9 +481,9 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isAsking) {
+    if (e.key === 'Enter' && !e.shiftKey && !isAsking && !isRecording) {
       e.preventDefault();
-      handleAsk();
+      handleAsk(false);
     }
   };
 
@@ -433,16 +526,44 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                 Ask any CPR-related question powered by Gemini / OpenAI. All audio will be muted while you receive your answer!
               </p>
 
-              <div className="mb-4">
+              <div className="mb-4 relative">
                 <textarea
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="e.g., How deep should my compressions be?"
-                  disabled={isAsking}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                  disabled={isAsking || isRecording}
+                  className="w-full px-4 py-3 pr-12 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
                   rows={3}
                 />
+                {/* Voice recording button */}
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isAsking}
+                  className={`absolute right-2 top-2 p-2 rounded-lg transition-colors ${
+                    isRecording
+                      ? 'bg-red-600 hover:bg-red-700 animate-pulse'
+                      : 'bg-purple-600/80 hover:bg-purple-700/80'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={isRecording ? 'Stop recording' : 'Record voice question'}
+                >
+                  {isRecording ? (
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                    </svg>
+                  )}
+                </button>
+                {isRecording && (
+                  <div className="absolute right-2 bottom-2 flex items-center gap-1 text-red-400 text-xs">
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    <span>Recording...</span>
+                  </div>
+                )}
               </div>
 
               {/* Display answer below question */}
@@ -484,8 +605,8 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                 </button>
                 {!answer && (
                   <button
-                    onClick={handleAsk}
-                    disabled={isAsking || !question.trim()}
+                    onClick={() => handleAsk(false)}
+                    disabled={isAsking || !question.trim() || isRecording}
                     className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-semibold"
                   >
                     {isAsking ? 'Asking...' : 'Ask'}

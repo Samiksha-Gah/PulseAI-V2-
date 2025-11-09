@@ -1,6 +1,8 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const multer = require('multer');
+const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
@@ -9,6 +11,9 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Environment variables
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
@@ -76,15 +81,67 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
+// Speech-to-text endpoint using OpenAI Whisper
+app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  if (!OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'OpenAI API key not configured' });
+  }
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    console.log('[Transcribe] Received audio file, size:', req.file.size, 'type:', req.file.mimetype);
+
+    // Convert audio to text using OpenAI Whisper
+    const formData = new FormData();
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname || 'recording.webm',
+      contentType: req.file.mimetype || 'audio/webm'
+    });
+    formData.append('model', 'whisper-1');
+
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        ...formData.getHeaders()
+      },
+      body: formData
+    });
+
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      console.error('[Transcribe] OpenAI Whisper error:', errorText);
+      return res.status(whisperResponse.status).json({ error: 'Transcription failed', details: errorText });
+    }
+
+    const whisperData = await whisperResponse.json();
+    const transcription = whisperData.text;
+
+    if (!transcription || transcription.trim().length === 0) {
+      return res.status(500).json({ error: 'Empty transcription received' });
+    }
+
+    console.log('[Transcribe] Transcription:', transcription);
+    res.json({ text: transcription, transcription: transcription });
+  } catch (err) {
+    console.error('[Transcribe] Error:', err);
+    res.status(500).json({ error: 'Transcription request failed', details: err.message });
+  }
+});
+
 // Query endpoint with Gemini + OpenAI fallback + TTS
 app.post('/api/query', async (req, res) => {
   const { question, context } = req.body;
+  const useOpenAI = req.query.useOpenAI === 'true' || req.body.useOpenAI === true;
 
   if (!question) {
     return res.status(400).json({ error: 'Question is required' });
   }
 
-  // Try Gemini first, fall back to OpenAI
+  // Try Gemini first, fall back to OpenAI (unless useOpenAI is true)
   if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Neither Gemini nor OpenAI API key is configured' });
   }
@@ -95,12 +152,15 @@ app.post('/api/query', async (req, res) => {
 
   try {
     console.log(`[Query] Question: "${question}"`);
+    if (useOpenAI) {
+      console.log('[Query] Skipping Gemini, using OpenAI directly (voice input)');
+    }
 
     let answer = null;
     let serviceUsed = null;
 
-    // 1. Try Gemini first if available
-    if (GEMINI_API_KEY) {
+    // 1. Try Gemini first if available (unless useOpenAI is true)
+    if (GEMINI_API_KEY && !useOpenAI) {
       try {
         // Build Gemini request body and log it to help debug 400s from the upstream API
         const brevityInstruction = `Provide a concise answer in one short sentence (max ${ANSWER_MAX_WORDS} words). Keep it direct and actionable.`;

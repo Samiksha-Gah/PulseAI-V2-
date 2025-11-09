@@ -23,6 +23,7 @@ export const BACKEND_URL = import.meta.env.DEV
 export const API_ENDPOINTS = {
   tts: `${BACKEND_URL}/api/tts`,
   query: `${BACKEND_URL}/api/query`,
+  transcribe: `${BACKEND_URL}/api/transcribe`,
   health: `${BACKEND_URL}/health`,
 };
 
