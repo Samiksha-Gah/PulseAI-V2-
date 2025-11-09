@@ -46,29 +46,49 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
 
 
   // Color mapping for status with auras
-  const colorClasses = {
+  type ColorKey = 'green' | 'orange' | 'red';
+  
+  const colorClasses: Record<ColorKey, string> = {
     green: 'bg-green-500/90 border-green-400',
     orange: 'bg-orange-500/90 border-orange-400',
     red: 'bg-red-500/90 border-red-400',
-  };
+  } as const;
 
-  const textColorClasses = {
+  const textColorClasses: Record<ColorKey, string> = {
     green: 'text-green-100',
     orange: 'text-orange-100',
     red: 'text-red-100',
   };
 
-  const iconColorClasses = {
+  const iconColorClasses: Record<ColorKey, string> = {
     green: 'text-green-300',
     orange: 'text-orange-300',
     red: 'text-red-300',
   };
 
-  const auraColors = {
+  const auraColors: Record<ColorKey, string> = {
     green: 'rgba(34, 197, 94, 0.3)',
     orange: 'rgba(249, 115, 22, 0.3)',
     red: 'rgba(239, 68, 68, 0.3)',
   };
+  
+  // Get the highest priority feedback
+  const getTopFeedback = () => {
+    const priorities = [
+      { feedback: rateFeedback, name: 'rate' },
+      { feedback: depthFeedback, name: 'depth' },
+      { feedback: placementFeedback, name: 'placement' },
+    ];
+    
+    // Sort by priority (highest first)
+    priorities.sort((a, b) => b.feedback.priority - a.feedback.priority);
+    
+    // Return the top priority feedback
+    return priorities[0].feedback;
+  };
+  
+  const topFeedback = getTopFeedback();
+  const feedbackColor = topFeedback.color as ColorKey;
 
   const compressionProgress = Math.min((compressionCount / 30) * 100, 100);
   const isComplete = compressionCount >= 30;
@@ -79,9 +99,9 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
       <motion.div
         animate={{
           boxShadow: [
-            `0 0 20px ${auraColors[prioritizedMessage.color]}`,
-            `0 0 40px ${auraColors[prioritizedMessage.color]}`,
-            `0 0 20px ${auraColors[prioritizedMessage.color]}`,
+            `0 0 20px ${auraColors[feedbackColor]}`,
+            `0 0 40px ${auraColors[feedbackColor]}`,
+            `0 0 20px ${auraColors[feedbackColor]}`,
           ],
         }}
         transition={{
@@ -89,18 +109,18 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
           repeat: Infinity,
           ease: 'easeInOut',
         }}
-        className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-40 px-6 py-4 rounded-xl shadow-2xl border-2 ${colorClasses[prioritizedMessage.color]} ${textColorClasses[prioritizedMessage.color]} backdrop-blur-md min-w-[300px] max-w-[600px]`}
+        className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-40 px-6 py-4 rounded-xl shadow-2xl border-2 ${colorClasses[feedbackColor]} ${textColorClasses[feedbackColor]} backdrop-blur-md min-w-[300px] max-w-[600px]`}
         style={{
-          boxShadow: `0 0 30px ${auraColors[prioritizedMessage.color]}`,
+          boxShadow: `0 0 30px ${auraColors[feedbackColor]}`,
         }}
       >
         <div className="flex items-center justify-center gap-3">
-          <div className={`text-2xl ${iconColorClasses[prioritizedMessage.color]}`}>
-            {prioritizedMessage.color === 'green' && '✓'}
-            {prioritizedMessage.color === 'orange' && '⚠'}
-            {prioritizedMessage.color === 'red' && '✕'}
+          <div className={`text-2xl ${iconColorClasses[feedbackColor]}`}>
+            {feedbackColor === 'green' && '✓'}
+            {feedbackColor === 'orange' && '⚠'}
+            {feedbackColor === 'red' && '✕'}
           </div>
-          <p className="font-semibold text-lg text-center">{prioritizedMessage.message}</p>
+          <p className="font-semibold text-lg text-center">{topFeedback.message}</p>
         </div>
       </motion.div>
 
