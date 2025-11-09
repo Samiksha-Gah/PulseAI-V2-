@@ -3,11 +3,10 @@
  * Displays comprehensive CPR feedback with modern UI and color-coded auras
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CPRMetrics } from '../utils/cprLogic';
-import { messagePrioritizer } from '../utils/messagePrioritizer';
 import { motion } from 'framer-motion';
-import { audioFeedback, AudioState } from '../utils/audioFeedback';
+import { audioFeedback } from '../utils/audioFeedback';
 export interface FeedbackPanelProps {
   metrics: CPRMetrics;
   metronomeEnabled?: boolean;
@@ -17,16 +16,10 @@ export interface FeedbackPanelProps {
 
 export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, onSaveVideo }: FeedbackPanelProps) {
   const { bpm, depthMm, placement, compressionCount, rateFeedback, depthFeedback, placementFeedback } = metrics;
-  const [prioritizedMessage, setPrioritizedMessage] = useState(
-    messagePrioritizer.getCurrentMessage()
-  );
-  
-  // Audio query state
-  const [isQueryMode, setIsQueryMode] = useState(false);
-  const [queryInput, setQueryInput] = useState('');
-  const [audioState, setAudioState] = useState<AudioState>(audioFeedback.getState());
-  const [isQueryLoading, setIsQueryLoading] = useState(false);
+  // Audio state
   const [isListening, setIsListening] = useState(false);
+  const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const audioState = useRef(audioFeedback.getState());
 
   // Handle query submission
   const handleQuerySubmit = async (question: string) => {
@@ -35,9 +28,8 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
     setIsQueryLoading(true);
     try {
       await audioFeedback.askQuestion(question, 'CPR training session');
-      setQueryInput('');
-      setIsQueryMode(false);
     } catch (err) {
+      console.error('Error asking question:', err);
       console.error('Query failed:', err);
       alert('Failed to get answer. Please try again.');
     } finally {
@@ -45,7 +37,7 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
     }
   };
 
-  // Update prioritized message - show ONLY ONE message at a time
+  // Show the highest priority message
   useEffect(() => {
     // Determine overall priority from individual feedbacks
     const priorities = [
@@ -59,28 +51,15 @@ export function FeedbackPanel({ metrics, metronomeEnabled, onMetronomeToggle, on
 
     // Show ONLY the highest priority message (one at a time)
     const topPriority = priorities[0];
-    let message = topPriority.feedback.message;
-    let color = topPriority.feedback.color;
-    const priority = topPriority.feedback.priority;
-
+    
     // Only show positive message if ALL are good (priority <= 1)
     if (priorities.every(p => p.feedback.priority <= 1)) {
-      message = 'Excellent CPR technique! Keep it up!';
-      color = 'green';
+      // Audio feedback for good technique
+      audioFeedback.playNotification('Excellent CPR technique! Keep it up!');
+    } else {
+      // Audio feedback for the highest priority issue
+      audioFeedback.playNotification(topPriority.feedback.message);
     }
-
-    const updated = messagePrioritizer.addMessage(message, color, priority);
-    setPrioritizedMessage(updated);
-  }, [rateFeedback, depthFeedback, placementFeedback]);
-
-  // Periodically check for queued message updates (less frequently)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const updated = messagePrioritizer.updateFromQueue();
-      setPrioritizedMessage(updated);
-    }, 1000); // Check every 1 second (slower updates)
-
-    return () => clearInterval(interval);
   }, []);
 
   // Color mapping for status with auras

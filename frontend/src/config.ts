@@ -5,6 +5,7 @@
 
 // For local development: http://localhost:3001
 // For production: https://your-backend.onrender.com
+// Use Vite's environment variables with default fallback
 export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 export const API_ENDPOINTS = {
