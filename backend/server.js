@@ -15,6 +15,7 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VOICE_ID = process.env.VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // Default: Sarah voice
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
 
 // Health check
 app.get('/health', (req, res) => {
@@ -85,16 +86,12 @@ app.post('/api/query', async (req, res) => {
     return res.status(400).json({ error: 'Question is required' });
   }
 
-  // Gemini is commented out, only need OpenAI
-  // if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
-  //   return res.status(500).json({ error: 'Neither Gemini nor OpenAI API key is configured' });
-  // }
-  
-  if (!OPENAI_API_KEY) {
+  // Try Gemini first, fall back to OpenAI
+  if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
     return res.status(500).json({ 
-      error: 'OpenAI API key is not configured',
+      error: 'Neither Gemini nor OpenAI API key is configured',
       errorType: 'API_KEY_MISSING',
-      details: 'OPENAI_API_KEY environment variable is not set'
+      details: 'At least one API key (GEMINI_API_KEY or OPENAI_API_KEY) must be set'
     });
   }
 
@@ -109,25 +106,25 @@ app.post('/api/query', async (req, res) => {
   try {
     console.log(`[Query] Question: "${question}"`);
 
-    // 1. Get answer from Gemini (COMMENTED OUT - using OpenAI only)
-    /*
-    // Use gemini-2.5-pro-preview-03-25 (works with this API key)
-    let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:generateContent?key=${GEMINI_API_KEY}`;
-    let geminiResponse = await fetch(
-      geminiUrl,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are a professional CPR instructor providing real-time guidance. Context: ${context || 'CPR training session'}. 
-                     Answer the following question concisely in 2-3 sentences, as if speaking to someone during training.
-                     Question: ${question}`
-            }]
-          }],
+    let answer = null;
+    let serviceUsed = null;
+
+    // 1. Try Gemini first if available
+    if (GEMINI_API_KEY) {
+      try {
+        console.log('[Query] Attempting Gemini API...');
+        
+        // Build Gemini request body and log it to help debug 400s from the upstream API
+        const geminiRequestBody = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are a professional CPR instructor providing real-time guidance. Context: ${context || 'CPR training session'}. Answer the following question concisely in 2-3 sentences, as if speaking to someone during training. Question: ${question}`
+                }
+              ]
+            }
+          ],
           generationConfig: {
             maxOutputTokens: 200,
             temperature: 0.7,
@@ -135,39 +132,146 @@ app.post('/api/query', async (req, res) => {
             topK: 40
           },
           safetySettings: [
-            {
-              category: 'HARM_CATEGORY_HARASSMENT',
-              threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              category: 'HARM_CATEGORY_HATE_SPEECH',
-              threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-              threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-              threshold: 'BLOCK_MEDIUM_AND_ABOVE'
-            }
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
           ]
-        })
+        };
+
+        console.log('[Query] Gemini request body (base):', JSON.stringify(geminiRequestBody));
+
+        // Helper to perform a Gemini request with a specific max tokens
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        console.log('[Query] Gemini URL:', geminiUrl);
+
+        const doGeminiRequest = async (maxTokens) => {
+          const body = { ...geminiRequestBody, generationConfig: { ...(geminiRequestBody.generationConfig || {}), maxOutputTokens: maxTokens } };
+          console.log(`[Query] Sending Gemini request with maxOutputTokens=${maxTokens}`);
+          const resp = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          if (!resp.ok) {
+            const errorText = await resp.text().catch(() => '<no body>');
+            console.error('[Query] Gemini error:', resp.status, errorText);
+            return { ok: false, status: resp.status, errorText };
+          }
+
+          let json;
+          try {
+            json = await resp.json();
+          } catch (parseErr) {
+            console.error('[Query] Failed to parse Gemini JSON:', parseErr);
+            return { ok: false, status: 500, errorText: String(parseErr) };
+          }
+
+          console.log('[Query] Gemini raw response:', JSON.stringify(json));
+          return { ok: true, status: resp.status, json };
+        };
+
+        // Try initial request with configured maxOutputTokens
+        const initialMax = geminiRequestBody.generationConfig && geminiRequestBody.generationConfig.maxOutputTokens ? geminiRequestBody.generationConfig.maxOutputTokens : 200;
+        let result = await doGeminiRequest(initialMax);
+        
+        if (!result.ok) {
+          // If 404 model not found, try listing models and return helpful error
+          if (result.status === 404) {
+            try {
+              const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
+              const listRes = await fetch(listUrl, { method: 'GET' });
+              const listJson = await listRes.json().catch(() => null);
+              console.error('[Query] Gemini models list:', listJson);
+              // Don't return error here, let it fall through to OpenAI
+            } catch (listErr) {
+              console.error('[Query] Failed to list models:', listErr);
+            }
+          }
+          // Continue to OpenAI fallback
+        } else {
+          let geminiData = result.json;
+
+          if (!geminiData.candidates || geminiData.candidates.length === 0) {
+            console.error('[Query] No candidates in Gemini response', geminiData);
+            // Continue to OpenAI fallback
+          } else {
+            // Robust extraction of generated text from Gemini response
+            const tryGet = (obj, ...path) => {
+              try {
+                let cur = obj;
+                for (const p of path) {
+                  if (cur == null) return null;
+                  cur = cur[p];
+                }
+                return cur == null ? null : cur;
+              } catch (e) {
+                return null;
+              }
+            };
+
+            // Common locations
+            answer = tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text');
+            answer = answer || tryGet(geminiData, 'candidates', 0, 'content', 0, 'text');
+            answer = answer || tryGet(geminiData, 'output', 0, 'content', 0, 'text');
+            answer = answer || tryGet(geminiData, 'output', 0, 'content', 0, 'parts', 0, 'text');
+            answer = answer || tryGet(geminiData, 'candidates', 0, 'output', 0, 'content', 0, 'text');
+            
+            // Fallback: any string found inside candidates[0]
+            if (!answer) {
+              const cand = tryGet(geminiData, 'candidates', 0) || {};
+              const walk = (o, parentKey) => {
+                if (!o || typeof o !== 'object') return null;
+                for (const k of Object.keys(o)) {
+                  const v = o[k];
+                  if (typeof v === 'string' && v.trim().length > 0) {
+                    if (/text|message|answer|content|utterance|output/i.test(k) || v.trim().length > 50) return v;
+                  }
+                  if (typeof v === 'object') {
+                    const r = walk(v, k);
+                    if (r) return r;
+                  }
+                }
+                return null;
+              };
+              answer = walk(cand, 'candidates[0]');
+            }
+
+            let truncated = geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].finishReason === 'MAX_TOKENS';
+
+            // If truncated and no answer, retry once with a larger token budget
+            if (!answer && truncated) {
+              console.log('[Query] Response truncated, retrying with larger maxOutputTokens (1024)');
+              const retryResult = await doGeminiRequest(1024);
+              if (retryResult.ok) {
+                geminiData = retryResult.json;
+                console.log('[Query] Gemini raw response (retry):', JSON.stringify(geminiData));
+                // attempt extraction again
+                answer = tryGet(geminiData, 'candidates', 0, 'content', 'parts', 0, 'text') || 
+                         tryGet(geminiData, 'candidates', 0, 'content', 0, 'text') || 
+                         tryGet(geminiData, 'output', 0, 'content', 0, 'text');
+                truncated = geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].finishReason === 'MAX_TOKENS';
+              }
+            }
+
+            if (answer && typeof answer === 'string' && answer.trim().length > 0) {
+              serviceUsed = 'gemini';
+              console.log(`[Query] Gemini Answer: "${answer}"`);
+            } else {
+              console.error('[Query] No textual answer found in Gemini response', geminiData);
+              // Continue to OpenAI fallback
+            }
+          }
+        }
+      } catch (geminiError) {
+        console.error('[Query] Gemini request failed:', geminiError);
+        // Continue to OpenAI fallback
       }
-    );
-    // ... rest of Gemini logic commented out ...
-    */
+    }
 
-    let answer = null;
-    // Skip Gemini, go directly to OpenAI
-    let useOpenAI = true;
-
-    // Use OpenAI directly (Gemini is commented out)
-    if (useOpenAI || !answer) {
-      if (!OPENAI_API_KEY) {
-        return res.status(500).json({ error: 'Gemini failed and OpenAI API key is not configured' });
-      }
-
+    // 2. Fall back to OpenAI if Gemini didn't work
+    if (!answer && OPENAI_API_KEY) {
       console.log('[Query] Using OpenAI API...');
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -241,6 +345,9 @@ app.post('/api/query', async (req, res) => {
       }
       
       console.log(`[Query] OpenAI Answer: "${answer}"`);
+      if (!serviceUsed) {
+        serviceUsed = 'openai';
+      }
     }
 
     // 2. Validate and return text answer (frontend will call TTS endpoint separately)
@@ -253,9 +360,12 @@ app.post('/api/query', async (req, res) => {
       });
     }
     
-    console.log(`[Query] Success: Returning text answer`);
+    console.log(`[Query] Success: Returning text answer (powered by ${serviceUsed || 'unknown'})`);
     res.setHeader('Content-Type', 'application/json');
-    res.json({ answer: answer });
+    res.json({ 
+      answer: answer,
+      service: serviceUsed || 'unknown' // 'gemini' or 'openai'
+    });
   } catch (err) {
     console.error('[Query] Error:', err);
     res.status(500).json({ 
@@ -285,6 +395,7 @@ app.listen(PORT, () => {
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
   console.log(`🔑 ElevenLabs API: ${ELEVENLABS_API_KEY ? '✓ Configured' : '✗ Missing'}`);
   console.log(`🔑 Gemini API: ${GEMINI_API_KEY ? '✓ Configured' : '✗ Missing'}`);
+  console.log(`🤖 Gemini Model: ${GEMINI_MODEL}`);
   console.log(`🔑 OpenAI API: ${OPENAI_API_KEY ? '✓ Configured' : '✗ Missing'}`);
   console.log(`🎤 Voice ID: ${VOICE_ID}`);
 });

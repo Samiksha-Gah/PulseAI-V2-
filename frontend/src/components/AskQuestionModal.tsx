@@ -19,6 +19,7 @@ interface AskQuestionModalProps {
 export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQuestionModalProps) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
+  const [service, setService] = useState<string | null>(null); // 'gemini' or 'openai'
   const [isAsking, setIsAsking] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
     setIsAsking(true);
     setError(null);
     setAnswer(null);
+    setService(null);
 
     // Stop metronome and pause audio feedback
     audioMetronome.stop();
@@ -314,7 +316,9 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
 
       // 2. Display the answer (no TTS for now)
       console.log('[AskQuestionModal] Setting answer:', queryData.answer);
+      console.log('[AskQuestionModal] Service used:', queryData.service);
       setAnswer(queryData.answer);
+      setService(queryData.service || null); // Store which service was used
       setError(null); // Clear any previous errors
       setIsAsking(false);
       setIsPlayingAudio(false);
@@ -379,6 +383,7 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
     if (!isAsking) {
       setQuestion('');
       setAnswer(null);
+      setService(null);
       setError(null);
       audioFeedback.resume();
       onClose();
@@ -448,6 +453,11 @@ export function AskQuestionModal({ isOpen, onClose, onAskStart, onAskEnd }: AskQ
                 <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <p className="text-sm font-semibold text-blue-300 mb-2">Answer:</p>
                   <p className="text-white text-sm leading-relaxed">{answer}</p>
+                  {service && (
+                    <p className="text-xs text-gray-500 mt-3 text-right italic">
+                      powered by {service === 'gemini' ? 'gemini' : service === 'openai' ? 'openai' : service}
+                    </p>
+                  )}
                 </div>
               )}
 
