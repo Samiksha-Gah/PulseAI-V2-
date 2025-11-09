@@ -456,13 +456,21 @@ app.post('/api/query', async (req, res) => {
 app.post('/api/summarize', async (req, res) => {
   const sessionData = req.body;
 
+  console.log('[Summarize] Request received');
+  console.log('[Summarize] Session data keys:', sessionData ? Object.keys(sessionData) : 'null');
+  console.log('[Summarize] Has samples:', sessionData?.samples ? sessionData.samples.length : 0);
+
   if (!sessionData) {
+    console.error('[Summarize] No session data provided');
     return res.status(400).json({ error: 'Session data is required' });
   }
 
   if (!GEMINI_API_KEY && !OPENAI_API_KEY) {
+    console.error('[Summarize] No API keys configured');
     return res.status(500).json({ error: 'Neither Gemini nor OpenAI API key is configured' });
   }
+
+  console.log('[Summarize] API keys available - Gemini:', !!GEMINI_API_KEY, 'OpenAI:', !!OPENAI_API_KEY);
 
   try {
   // Request a strict JSON object from the LLM so the frontend can render predefined sections.
@@ -474,16 +482,18 @@ app.post('/api/summarize', async (req, res) => {
   //   "recommendations": [string],
   //   "uncertainties": [string]
   // }
-  const prompt = `You are an expert CPR instructor and data analyst. Given the following session JSON (per-second CPR metrics), produce a JSON object that strictly follows this schema (no markdown, no explanations):
-\n+    {
-    "executiveSummary": "short 2-4 sentence summary",
-    "keyMetrics": { "averageBPM": number, "averageDepthMm": number, "totalCompressions": number, "timeInTargetRangeSec": number },
-    "timeline": [{ "time": "ISO timestamp or relative", "event": "description" }],
-    "recommendations": ["bullet items, concise"],
-    "uncertainties": ["notes about missing or unreliable data"]
-  }
-\n+    Be explicit about units and assumptions. Now provide the JSON for this session data:
-\n+    ${JSON.stringify(sessionData, null, 2)}`;
+  const prompt = `You are an expert CPR instructor and data analyst. Given the following session JSON (per-second CPR metrics), produce a JSON object that strictly follows this schema (no markdown, no explanations, just pure JSON):
+
+{
+  "executiveSummary": "short 2-4 sentence summary",
+  "keyMetrics": { "averageBPM": number, "averageDepthMm": number, "totalCompressions": number, "timeInTargetRangeSec": number },
+  "timeline": [{ "time": "ISO timestamp or relative", "event": "description" }],
+  "recommendations": ["bullet items, concise"],
+  "uncertainties": ["notes about missing or unreliable data"]
+}
+
+Be explicit about units and assumptions. Return ONLY valid JSON, no markdown code blocks, no explanations. Session data:
+${JSON.stringify(sessionData, null, 2)}`;
 
     let summary = null;
     let serviceUsed = null;
@@ -522,14 +532,22 @@ app.post('/api/summarize', async (req, res) => {
           const rawText = tryGet(gJson, 'candidates', 0, 'content', 'parts', 0, 'text') || tryGet(gJson, 'candidates', 0, 'content', 0, 'text') || tryGet(gJson, 'output', 0, 'content', 0, 'text');
           if (rawText) {
             try {
-              const parsed = JSON.parse(rawText);
+              // Try to extract JSON from markdown code blocks if present
+              let jsonText = rawText.trim();
+              // Remove markdown code blocks if present
+              jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+              const parsed = JSON.parse(jsonText);
               summary = parsed;
               serviceUsed = 'gemini';
+              console.log('[Summarize] Successfully parsed Gemini response');
             } catch (e) {
-              // Not valid JSON - keep raw text in fallback
+              // Not valid JSON - log the error and continue to fallback
+              console.warn('[Summarize] Gemini returned non-JSON:', e.message);
+              console.warn('[Summarize] Raw text (first 200 chars):', rawText.substring(0, 200));
               summary = null;
-              console.warn('[Summarize] Gemini returned non-JSON; raw text will be used as fallback');
             }
+          } else {
+            console.warn('[Summarize] Gemini response had no text content');
           }
         } else {
           console.warn('[Summarize] Gemini request failed, falling back to OpenAI if available');
@@ -542,14 +560,15 @@ app.post('/api/summarize', async (req, res) => {
     // Fallback to OpenAI if Gemini didn't produce an answer
     if (!summary && OPENAI_API_KEY) {
       try {
-        const openaiModel = 'gpt-4';
+        console.log('[Summarize] Attempting OpenAI fallback...');
+        const openaiModel = 'gpt-3.5-turbo'; // Use gpt-3.5-turbo for better reliability
         const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
           body: JSON.stringify({
             model: openaiModel,
             messages: [
-              { role: 'system', content: 'You are an expert CPR instructor and data analyst. Summarize session metrics into a human-readable report in Markdown.' },
+              { role: 'system', content: 'You are an expert CPR instructor and data analyst. Return ONLY valid JSON, no markdown code blocks, no explanations.' },
               { role: 'user', content: prompt }
             ],
             max_tokens: 2000,
@@ -564,18 +583,27 @@ app.post('/api/summarize', async (req, res) => {
             const raw = choice.message?.content || choice.text || null;
             if (raw) {
               try {
-                const parsed = JSON.parse(raw);
+                // Try to extract JSON from markdown code blocks if present
+                let jsonText = raw.trim();
+                jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+                const parsed = JSON.parse(jsonText);
                 summary = parsed;
                 serviceUsed = 'openai';
+                console.log('[Summarize] Successfully parsed OpenAI response');
               } catch (e) {
-                console.warn('[Summarize] OpenAI returned non-JSON; raw text will be used as fallback');
+                console.warn('[Summarize] OpenAI returned non-JSON:', e.message);
+                console.warn('[Summarize] Raw text (first 200 chars):', raw.substring(0, 200));
                 summary = null;
               }
+            } else {
+              console.warn('[Summarize] OpenAI response had no content');
             }
+          } else {
+            console.warn('[Summarize] OpenAI response had no choices');
           }
         } else {
           const errText = await openaiResp.text().catch(() => '<no body>');
-          console.error('[Summarize] OpenAI error:', errText);
+          console.error('[Summarize] OpenAI error:', openaiResp.status, errText);
         }
       } catch (openaiErr) {
         console.error('[Summarize] OpenAI request failed:', openaiErr);
@@ -609,7 +637,15 @@ app.post('/api/summarize', async (req, res) => {
         if (fallbackResp.ok) {
           const fallbackJson = await fallbackResp.json();
           const fallbackText = fallbackJson.choices && fallbackJson.choices[0] && (fallbackJson.choices[0].message?.content || fallbackJson.choices[0].text);
-          return res.json({ structured: null, raw: fallbackText || 'No summary available', service: 'openai' });
+          if (fallbackText) {
+            console.log('[Summarize] Fallback plaintext summary generated');
+            return res.json({ structured: null, raw: fallbackText, service: 'openai' });
+          } else {
+            console.warn('[Summarize] Fallback response had no text content');
+          }
+        } else {
+          const errText = await fallbackResp.text().catch(() => '<no body>');
+          console.error('[Summarize] Fallback OpenAI error:', fallbackResp.status, errText);
         }
       }
     } catch (e) {
