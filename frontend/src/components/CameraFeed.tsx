@@ -19,9 +19,10 @@ export type { CPRMetrics };
 
 interface CameraFeedProps {
   onMetricsUpdate: (metrics: CPRMetrics) => void;
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void; // Callback when canvas is ready for recording
 }
 
-export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
+export function CameraFeed({ onMetricsUpdate, onCanvasReady }: CameraFeedProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const blurCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -203,6 +204,11 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
       canvas.height = video.videoHeight;
       blurCanvas.width = video.videoWidth;
       blurCanvas.height = video.videoHeight;
+      
+      // Notify parent that canvas is ready for recording
+      if (onCanvasReady) {
+        onCanvasReady(canvas);
+      }
     }
 
     const now = Date.now();
@@ -467,6 +473,16 @@ export function CameraFeed({ onMetricsUpdate }: CameraFeedProps) {
             setIsInitialized(true);
             animationFrameRef.current = requestAnimationFrame(processFrame);
             setNeedsInteraction(false);
+            
+            // Notify parent that canvas is ready for recording
+            if (canvasRef.current && onCanvasReady) {
+              // Wait a frame to ensure canvas is fully rendered
+              requestAnimationFrame(() => {
+                if (canvasRef.current) {
+                  onCanvasReady(canvasRef.current);
+                }
+              });
+            }
           } catch (playErr) {
             console.warn('Autoplay blocked, user interaction required to start video', playErr);
             setNeedsInteraction(true);
