@@ -204,7 +204,6 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryStructured, setSummaryStructured] = useState<any | null>(null);
   const [summaryRaw, setSummaryRaw] = useState<string | null>(null);
-  const [summaryService, setSummaryService] = useState<string | null>(null);
 
   const handleSummarizeSession = async () => {
     const data = recordedDataRef.current;
@@ -217,7 +216,6 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
   setIsSummaryOpen(true);
   setSummaryStructured(null);
   setSummaryRaw(null);
-  setSummaryService(null);
 
     try {
       const resp = await fetch(API_ENDPOINTS.summarize, {
@@ -234,7 +232,6 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
       const json = await resp.json();
       setSummaryStructured(json.structured || null);
       setSummaryRaw(json.raw || null);
-      setSummaryService(json.service || null);
     } catch (err) {
       console.error('Failed to summarize session:', err);
       setSummaryRaw(`Failed to generate summary: ${err instanceof Error ? err.message : String(err)}`);
@@ -283,7 +280,7 @@ export function FeedbackMode({ onBack }: FeedbackModeProps) {
         />
       )}
 
-  <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} loading={isSummarizing} structured={summaryStructured} raw={summaryRaw} service={summaryService} />
+  <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} loading={isSummarizing} structured={summaryStructured} raw={summaryRaw} />
 
       {/* Metronome */}
       <Metronome

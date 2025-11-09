@@ -15,10 +15,9 @@ interface SummaryModalProps {
   loading: boolean;
   structured?: SummaryStructured | null;
   raw?: string | null;
-  service?: string | null;
 }
 
-export function SummaryModal({ isOpen, onClose, loading, structured, raw, service }: SummaryModalProps) {
+export function SummaryModal({ isOpen, onClose, loading, structured, raw }: SummaryModalProps) {
   const downloadSummary = React.useCallback(() => {
     try {
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
